@@ -1,7 +1,7 @@
 ---
 id: WO-WATCHDOG-001
 title: Claude Code 看門狗自動重啟機制
-status: ready
+status: done
 priority: medium
 created: 2026-03-24
 ---

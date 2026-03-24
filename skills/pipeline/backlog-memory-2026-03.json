@@ -1,0 +1,76 @@
+{
+  "id": "WO-MEMORY-202603",
+  "title": "MEMORY.md 待處理清單 — 2026-03",
+  "created": "2026-03-24",
+  "phases": ["s1", "s2", "s3"],
+  "phase_labels": {
+    "s1": "設計／確認",
+    "s2": "實作／執行",
+    "s3": "驗證／收尾"
+  },
+  "stories": [
+    {
+      "id": 1,
+      "title": "Cloudflare Tunnel 路徑更新",
+      "owner": "阿普",
+      "complexity": "S",
+      "status": "pending",
+      "note": "從 90_System/Deliverables/ 改指 60_Deliverables/。單純路徑修改，最快完成。",
+      "phases": { "s1": null, "s2": null, "s3": null }
+    },
+    {
+      "id": 2,
+      "title": "Skill 存放位置確認",
+      "owner": "阿普",
+      "complexity": "S",
+      "status": "pending",
+      "note": "阿普的 Skill 是否從 Vault 搬出，正在跟德瑪/小蝦確認。s1 確認決策，s2 若需搬移則執行，s3 更新相關文件。",
+      "phases": { "s1": null, "s2": null, "s3": null }
+    },
+    {
+      "id": 3,
+      "title": "30_Resources vs 30_Knowledge 合併確認",
+      "owner": "阿普",
+      "complexity": "S",
+      "status": "pending",
+      "note": "確認 Vault 兩個資料夾是否合併。s1 確認決策，s2 若合併則執行搬移，s3 更新 VAULT-GUIDE.md。",
+      "phases": { "s1": null, "s2": null, "s3": null }
+    },
+    {
+      "id": 4,
+      "title": "建立 4 本主題筆記本（NotebookLM）",
+      "owner": "阿普",
+      "complexity": "M",
+      "status": "pending",
+      "note": "科技、寶可夢、電影、性別 — 各建一本 NotebookLM 筆記本。s1 確認每本的初始來源，s2 建立並匯入第一批資料，s3 測試查詢。",
+      "phases": { "s1": null, "s2": null, "s3": null }
+    },
+    {
+      "id": 5,
+      "title": "設定 50 個頻道清單（主題→頻道映射）",
+      "owner": "阿普",
+      "complexity": "M",
+      "status": "pending",
+      "note": "content-digest 的頻道擴充。目前 AI 學習已有 6 個 YT 頻道。s1 設計主題清單，s2 填入各主題的頻道 URL，s3 更新 channels.md 並測試 content-digest。",
+      "phases": { "s1": null, "s2": null, "s3": null }
+    },
+    {
+      "id": 6,
+      "title": "視覺化管理看板",
+      "owner": "阿普",
+      "complexity": "L",
+      "status": "pending",
+      "note": "技能、筆記本、摘要的賞心悅目 Dashboard（參考 Codex UI）。s1 確認技術選型和 wireframe，s2 實作，s3 部署測試。",
+      "phases": { "s1": null, "s2": null, "s3": null }
+    },
+    {
+      "id": 7,
+      "title": "mcp-reddit 安裝設定",
+      "owner": "阿普",
+      "complexity": "S",
+      "status": "blocked",
+      "note": "等 Reddit API 審核（申請人：walkpod）。審核通過後：裝 mcp-reddit + 設定 .mcp.json。blocked 直到審核通過。",
+      "phases": { "s1": null, "s2": null, "s3": null }
+    }
+  ]
+}

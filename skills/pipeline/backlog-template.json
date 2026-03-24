@@ -1,0 +1,31 @@
+{
+  "id": "WO-XXX",
+  "title": "任務集名稱",
+  "created": "YYYY-MM-DD",
+  "phases": ["s1", "s2", "s3"],
+  "phase_labels": {
+    "s1": "設計",
+    "s2": "實作",
+    "s3": "驗證"
+  },
+  "stories": [
+    {
+      "id": 1,
+      "title": "第一個任務",
+      "owner": "阿普",
+      "complexity": "S",
+      "status": "pending",
+      "note": "任務說明：要做什麼、參考哪些現有資料",
+      "phases": { "s1": null, "s2": null, "s3": null }
+    },
+    {
+      "id": 2,
+      "title": "第二個任務",
+      "owner": "阿普",
+      "complexity": "M",
+      "status": "pending",
+      "note": "任務說明",
+      "phases": { "s1": null, "s2": null, "s3": null }
+    }
+  ]
+}

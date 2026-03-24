@@ -1,0 +1,117 @@
+{
+  "id": "WO-SKILLSTORE-001",
+  "title": "Life-OS Skill Store — HTML 視覺化管理看板",
+  "created": "2026-03-24",
+  "phases": [
+    "s1",
+    "s2",
+    "s3",
+    "s4"
+  ],
+  "phase_labels": {
+    "s1": "規格設計",
+    "s2": "實作",
+    "s3": "整合",
+    "s4": "部署收尾"
+  },
+  "stories": [
+    {
+      "id": 1,
+      "title": "前置：imagen-gen skill 驗證",
+      "owner": "阿普（Claude Code）",
+      "complexity": "S",
+      "status": "done",
+      "note": "確認 imagen-gen.py 在本機可用：(1) 確認 python3 版本 (2) 確認 API key 路徑存在且有效 (3) 跑一張測試圖確認成功。這是 story 3 的阻塞前提。",
+      "phases": {
+        "s1": "2026-03-24T02:38:52Z",
+        "s2": "2026-03-24T02:38:52Z",
+        "s3": "2026-03-24T02:38:52Z",
+        "s4": "2026-03-24T02:38:52Z"
+      }
+    },
+    {
+      "id": 2,
+      "title": "視覺規格：整體設計系統",
+      "owner": "阿普（Claude Code）",
+      "complexity": "M",
+      "status": "done",
+      "note": "定義完整視覺規格：卡片尺寸、icon 位置/大小（建議 64x64px，圓角 16px）、字型、深色背景色系、hover 效果、搜尋欄樣式。產出一份 design-spec.md 作為 story 3（UI）和 story 4（icon）的共同依據。",
+      "phases": {
+        "s1": "2026-03-24T02:39:37Z",
+        "s2": "2026-03-24T02:51:46Z",
+        "s3": "2026-03-24T02:51:46Z",
+        "s4": "2026-03-24T02:51:46Z"
+      }
+    },
+    {
+      "id": 3,
+      "title": "UI 實作：HTML/CSS 骨架（Codex）",
+      "owner": "Codex + 阿普",
+      "complexity": "M",
+      "status": "done",
+      "note": "依 story 2 的 design-spec.md 給 Codex 截圖 + 規格，讓它生成 HTML/CSS。icon 先用 placeholder（灰色圓角方塊）。阿普取回後放入 Life-OS/skill-store/index.html。",
+      "phases": {
+        "s1": "2026-03-24T02:55:01Z",
+        "s2": "2026-03-24T02:55:01Z",
+        "s3": "2026-03-24T02:55:01Z",
+        "s4": "2026-03-24T02:55:01Z"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Icon 批次生成（龍蝦 imagen-gen）",
+      "owner": "阿普 → 龍蝦",
+      "complexity": "M",
+      "status": "pending",
+      "note": "依 story 2 規格（64x64, 圓角 16px, iOS app icon 風格）：(1) 阿普產出 icon-prompts.txt（29 個 skill，每個一行 prompt）(2) 跑批次腳本，呼叫 imagen-gen.py --fast，存進各 skills/[name]/icon.png (3) 確認 29 張全部生成成功。",
+      "phases": {
+        "s1": null,
+        "s2": null,
+        "s3": null,
+        "s4": null
+      }
+    },
+    {
+      "id": 5,
+      "title": "資料層：SKILL.md 解析器 → skills.json",
+      "owner": "阿普（Claude Code）",
+      "complexity": "S",
+      "status": "done",
+      "note": "Python/bash 掃 skills/ 目錄，讀每個 SKILL.md frontmatter（name/description/version/triggers/icon路徑），輸出靜態 skill-store/skills.json 供前端讀取。",
+      "phases": {
+        "s1": "2026-03-24T02:52:28Z",
+        "s2": "2026-03-24T02:52:28Z",
+        "s3": "2026-03-24T02:52:28Z",
+        "s4": "2026-03-24T02:52:28Z"
+      }
+    },
+    {
+      "id": 6,
+      "title": "前端整合：搜尋 + 篩選 + icon 顯示",
+      "owner": "阿普（Claude Code）",
+      "complexity": "M",
+      "status": "done",
+      "note": "把 story 3（HTML）+ story 4（icon）+ story 5（skills.json）整合：動態讀取 skills.json、搜尋即篩、類別 tag、icon 顯示（找不到 icon.png 則 fallback 到 emoji）。",
+      "phases": {
+        "s1": "2026-03-24T02:54:31Z",
+        "s2": "2026-03-24T02:54:31Z",
+        "s3": "2026-03-24T02:54:31Z",
+        "s4": "2026-03-24T02:54:31Z"
+      }
+    },
+    {
+      "id": 7,
+      "title": "部署：靜態 server + Cloudflare Tunnel",
+      "owner": "阿普（Claude Code）",
+      "complexity": "S",
+      "status": "done",
+      "note": "啟動靜態 server（vault-static-server.js 或新建），Cloudflare Tunnel 指向。更新待處理清單裡的 Cloudflare 路徑問題一起解決。",
+      "phases": {
+        "s1": "2026-03-24T02:55:01Z",
+        "s2": "2026-03-24T02:55:01Z",
+        "s3": "2026-03-24T02:55:01Z",
+        "s4": "2026-03-24T02:55:01Z"
+      }
+    }
+  ]
+}

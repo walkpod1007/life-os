@@ -1,0 +1,272 @@
+[
+  {
+    "name": "capture",
+    "description": "萬能 URL 捕捉手",
+    "version": "1.0.0",
+    "category": "content",
+    "icon": "../skills/capture/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "content-digest",
+    "description": "定時從 YouTube 訂閱、Podcast、RSS 抓最新內容，去重分類後推 Telegram 一份摘要",
+    "version": "1.0.0",
+    "category": "content",
+    "icon": "../skills/content-digest/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "daily-log",
+    "description": "手動觸發今日日誌摘要",
+    "version": "1.0.0",
+    "category": "daily",
+    "icon": "../skills/daily-log/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "daily-review",
+    "description": "早晨一鍵啟動：整合 Google Calendar 今日行程 + Gmail 未讀信件 + Life OS 待處理清單，",
+    "version": "1.0.0",
+    "category": "daily",
+    "icon": "../skills/daily-review/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "gcal-check",
+    "description": "查詢 Google Calendar 行程，支援今天、明天、本週、指定日期，判斷是否有空",
+    "version": "1.0.0",
+    "category": "system",
+    "icon": "../skills/gcal-check/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "gmail-triage",
+    "description": "整理 Gmail 未讀信件，找出需要行動的，分類優先級",
+    "version": "1.0.0",
+    "category": "system",
+    "icon": "../skills/gmail-triage/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "heartbeat-checkin",
+    "description": "每 2 小時主動用 Telegram 問一個引導性問題，協助維持節奏",
+    "version": "1.0.0",
+    "category": "daily",
+    "icon": "../skills/heartbeat-checkin/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "imagen-gen",
+    "description": "用 Gemini Nano Banana 生成圖片，輸出 PNG",
+    "version": "1.0.0",
+    "category": "image",
+    "icon": "../skills/imagen-gen/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "insight",
+    "description": "系統自我優化回顧",
+    "version": "1.0.0",
+    "category": "review",
+    "icon": "../skills/insight/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "life-os-checklist",
+    "description": "追蹤生活週期事務（車輛、健康、財務、消耗品），根據今天日期找出過期或即將到期的項目",
+    "version": "1.0.0",
+    "category": "daily",
+    "icon": "../skills/life-os-checklist/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "loop-manager",
+    "description": "列出、啟動、暫停所有 /loop 任務，查看心跳狀態",
+    "version": "1.0.0",
+    "category": "pipeline",
+    "icon": "../skills/loop-manager/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "morning-brief",
+    "description": "每天早上自動整合行事曆、昨日 log、待處理清單，生成 150 字晨報推送 Telegram",
+    "version": "1.0.0",
+    "category": "daily",
+    "icon": "../skills/morning-brief/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "notebooklm-query",
+    "description": "查詢 NotebookLM 筆記本，根據已匯入的來源回答問題（零幻覺）",
+    "version": "1.0.0",
+    "category": "knowledge",
+    "icon": "../skills/notebooklm-query/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "notebooklm-save",
+    "description": "將 NotebookLM 查詢結果存成 .md 檔案到 Vault",
+    "version": "1.0.0",
+    "category": "knowledge",
+    "icon": "../skills/notebooklm-save/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "obsidian-capture",
+    "description": "快速把想法、筆記、內容存進 Obsidian Vault，自動歸類到正確資料夾",
+    "version": "1.0.0",
+    "category": "system",
+    "icon": "../skills/obsidian-capture/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "openhue",
+    "description": "控制 Philips Hue 燈光和情境，使用 openhue CLI 透過 Hue Bridge 操作",
+    "version": "1.0.0",
+    "category": "home",
+    "icon": "../skills/openhue/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "pipeline",
+    "description": "任務輸送帶",
+    "version": "1.0.0",
+    "category": "pipeline",
+    "icon": "../skills/pipeline/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "podcast-grabber",
+    "description": "抓取 Podcast（RSS/Spotify/Apple），產出 NotebookLM-ready 的 Markdown",
+    "version": "1.0.0",
+    "category": "content",
+    "icon": "../skills/podcast-grabber/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "roborock",
+    "description": "控制 Roborock 掃地機器人：啟動、暫停、回充、查狀態、指定房間、查耗材",
+    "version": "1.0.0",
+    "category": "home",
+    "icon": "../skills/roborock/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "samsung-frame-art",
+    "description": "Samsung Frame TV 換畫：從 Artvee 自動抓取世界名畫，或從 TMDB 推送電影海報，合成後上傳到",
+    "version": "1.0.0",
+    "category": "home",
+    "icon": "../skills/samsung-frame-art/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "samsung-smartthings",
+    "description": "控制所有 Samsung SmartThings 設備：電視（開關、切輸入源、音量）、空氣清淨機、冷氣、洗衣機等",
+    "version": "1.0.0",
+    "category": "home",
+    "icon": "../skills/samsung-smartthings/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "skill-optimizer",
+    "description": "分析過去對話紀錄，找出重複的摩擦點，提出 SKILL.md 和 CLAUDE.local.md 的具體優化建議",
+    "version": "1.0.0",
+    "category": "system",
+    "icon": "../skills/skill-optimizer/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "smart-home",
+    "description": "智慧居家統一入口，路由到正確設備：Samsung SmartThings（電視、空氣清淨機、冷氣）、Roborock 掃",
+    "version": "1.0.0",
+    "category": "home",
+    "icon": "../skills/smart-home/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "social-monitor",
+    "description": "定期抓取 Reddit/PTT 訂閱版面的最新內容，生成摘要推送 Telegram",
+    "version": "1.0.0",
+    "category": "social",
+    "icon": "../skills/social-monitor/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "sonoscli",
+    "description": "播放音樂、調整音量、顯示現正播放",
+    "version": "1.0.0",
+    "category": "home",
+    "icon": "../skills/sonoscli/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "telegram-handler",
+    "description": "每次收到 Telegram 訊息時的標準前置處理",
+    "version": "1.0.0",
+    "category": "system",
+    "icon": "../skills/telegram-handler/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "triad-tools",
+    "description": "三大金剛派工路由：判斷任務應該交給 Gemini CLI（one-shot 內容）、Codex CLI（工程任務）還是",
+    "version": "1.0.0",
+    "category": "system",
+    "icon": "../skills/triad-tools/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "week-push",
+    "description": "週日自動執行 insight 並將週回顧結果推送到 Telegram",
+    "version": "1.0.0",
+    "category": "review",
+    "icon": "../skills/week-push/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "xiaomi-home",
+    "description": "透過局域網直連控制小米家居設備（智能插座、加濕器、電鍋等），使用 miiocli，不需雲端 API，速度快",
+    "version": "1.0.0",
+    "category": "home",
+    "icon": "../skills/xiaomi-home/icon.png",
+    "triggers": [],
+    "installed": true
+  },
+  {
+    "name": "youtube-grabber",
+    "description": "抓取 YouTube 頻道/播放清單/影片，產出 NotebookLM-ready 的 Markdown 摘要包",
+    "version": "1.0.0",
+    "category": "content",
+    "icon": "../skills/youtube-grabber/icon.png",
+    "triggers": [],
+    "installed": true
+  }
+]

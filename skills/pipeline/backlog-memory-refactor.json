@@ -1,0 +1,64 @@
+{
+  "id": "WO-040",
+  "title": "記憶架構重構",
+  "phases": ["s1", "s2", "s3"],
+  "phase_labels": {
+    "s1": "設計/確認",
+    "s2": "實作",
+    "s3": "驗證"
+  },
+  "stories": [
+    {
+      "id": 1,
+      "title": "MEMORY.md 信使化",
+      "owner": "阿普",
+      "complexity": "S",
+      "status": "in_progress",
+      "note": "CLAUDE.md 已加入 session 開始讀完即清空規則（s1完成）。驗證 SessionEnd hook (claude-hook-session-end.sh) 是否覆寫 MEMORY.md（非 append）。session 完整記錄確保寫進 daily/YYYY-MM.md。",
+      "phases": {
+        "s1": "2026-03-24T06:59:00Z",
+        "s2": null,
+        "s3": null
+      }
+    },
+    {
+      "id": 2,
+      "title": "CLAUDE.md 路由化：建立 soul.md",
+      "owner": "阿普",
+      "complexity": "M",
+      "status": "pending",
+      "note": "從 CLAUDE.local.md 提取「決策模式」「AI 使用原則」「Memory 規則」，整理成 ~/.claude/soul.md（給 Claude 讀的行為約束）。在 CLAUDE.md 加入 @soul.md 引用。參考：09_Gems/Claude-Code-記憶架構設計原則.md",
+      "phases": {
+        "s1": null,
+        "s2": null,
+        "s3": null
+      }
+    },
+    {
+      "id": 3,
+      "title": "CLAUDE.md 路由化：建立 user-life.md",
+      "owner": "阿普",
+      "complexity": "S",
+      "status": "pending",
+      "note": "把 CLAUDE.local.md 的「我是誰」「溝通風格」「工作 context」「技術環境」「週期性事務」移進 ~/.claude/user-life.md。這個檔案不常駐，按需讀。CLAUDE.local.md 只留 Life-OS 專案特有規則。",
+      "phases": {
+        "s1": null,
+        "s2": null,
+        "s3": null
+      }
+    },
+    {
+      "id": 4,
+      "title": "移除 memory MCP 驗收",
+      "owner": "阿普",
+      "complexity": "XS",
+      "status": "in_progress",
+      "note": "settings.json 和 .mcp.json 的 memory MCP 已移除（s1完成）。下次 session 啟動後確認 mcp__memory__* 工具不再出現。",
+      "phases": {
+        "s1": "2026-03-24T06:54:00Z",
+        "s2": null,
+        "s3": null
+      }
+    }
+  ]
+}
