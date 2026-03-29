@@ -202,7 +202,7 @@ function boostKeywords(newKeywords: ChannelKeyword[]): void {
       channel.unshift(existing)
     } else {
       // need channel: append [inferred] tag
-      const entry = c === 'need' ? \`\${k} [inferred]\` : k
+      const entry = c === 'need' ? `${k} [inferred]` : k
       channel.unshift(entry)
     }
     // Enforce LRU limit: remove from tail
