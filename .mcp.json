@@ -1,3 +1,15 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "line-lobster": {
+      "command": "/opt/homebrew/bin/bun",
+      "args": [
+        "/Users/Modema11434/Documents/Life-OS/plugins/line-lobster/server.ts"
+      ]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp", "--headless"],
+      "env": {}
+    }
+  }
 }
