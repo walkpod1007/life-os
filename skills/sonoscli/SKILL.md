@@ -312,6 +312,24 @@ bash ~/Documents/Life-OS/scripts/playlist-manager.sh play "清單名稱" [--name
 | 存成清單「名稱」/ 存下來叫「名稱」 | `playlist-manager.sh save "名稱"` |
 | 放清單「名稱」/ 播放清單「名稱」 | `playlist-manager.sh play "名稱"` |
 
+### 平台升級（v2 待做）
+
+現有清單平台狀態：
+- 星際異攻隊3：全 Qobuz ✅
+- 日本動漫：全 TIDAL（目標升 Qobuz）
+- 蛋堡：TIDAL×2 + Apple Music×1 + Qobuz×1
+- 張國榮：全 Amazon Music（36 首）
+
+**中文曲目搜尋注意事項（重要）：**
+Qobuz/TIDAL 索引用拉丁字符，純漢字搜尋命中率低。必須雙軌搜尋：
+- 藝人：漢字 + 英文名（例如 張國榮 → Leslie Cheung）
+- 歌名：漢字 + 拼音（用 `pypinyin` 套件轉換）
+- 已知對照：需手建中英藝人對照表
+
+v2 實作時需要：`pypinyin`、藝人對照表、搜尋結果人工確認機制（避免換錯歌）
+
+---
+
 ### LINE 回應格式
 
 **list：**
