@@ -1,5 +1,15 @@
 # sonoscli CHANGELOG
 
+## v1.4.0 — 2026-04-05
+
+- 改了什麼：新增 Sonos 原生播放清單管理功能（list / save / play）
+- 為什麼改：原本無法從 Telegram 快速叫出清單播放，也無法把當前 queue 存成命名清單
+- 新增檔案：`scripts/playlist-manager.py`（soco）、`scripts/playlist-manager.sh`（bash 入口）
+- 觸發詞：「列出清單」「存成清單」「放清單 <名稱>」
+- 驗證方式：E2E 跑 list/play/save 全部通過，36 首清單存取成功
+- 注意：僅操作 Sonos 原生清單，不含 Spotify/Qobuz/TIDAL 串流服務清單
+
+
 ## v1.3.9 — 2026-03-21
 
 - 改了什麼：修正 icon 與 Up Next 閃爍；前端只在資料變化時更新來源 icon/標題/meta，不再每輪詢重寫 DOM。
