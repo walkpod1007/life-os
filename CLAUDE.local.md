@@ -1,6 +1,6 @@
 # CLAUDE.local.md — Life OS 專案指令
 
-> 最後更新：2026-04-01
+> 最後更新：2026-04-05
 
 @/Users/Modema11434/Documents/Life-OS/handoff.md
 
@@ -35,10 +35,16 @@
 | 「蝦皮」「幫我買」 | `playwright-task` → recipes/shopee.md（即興探路） |
 | 「UNIQLO」 | `playwright-task` → recipes/uniqlo.md（即興探路） |
 | 「訂餐廳」「訂位」「幫我訂」+ 餐廳名稱 | `playwright-task` → 即興探路 |
-| 「建 web app」「設計前端」「出 UI」「做頁面」 | Figma MCP 先出設計稿，再從設計稿轉 HTML |
+| 「列出清單」「我的清單」「有哪些清單」 | `sonoscli` → `playlist-manager.sh list` |
+| 「存成清單」「存下來叫」+ 名稱 | `sonoscli` → `playlist-manager.sh save` |
+| 「放清單」+ 名稱 / 「播放清單」+ 名稱 | `sonoscli` → `playlist-manager.sh play` |
+| 「建 web app」「設計前端」「出 UI」「做頁面」「出儀表板」 | `frontend` → 選 plugins/frontend/recipes/ 對應食譜 → Agent 產出 HTML → 放 60_Deliverables/ |
+| 「跑到完成」「一直跑直到」「反覆執行直到」+ 任務描述 | `ralph-loop` via RemoteTrigger，帶 --completion-promise |
 
 capture / cash-* 一律開 Agent 子代理執行，主 session 只回「收到，擷取中」。
-playwright-task 一律開 Agent 子代理執行，主 session 只回「收到，瀏覽器任務開始跑」。
+playwright-task 一律走 RemoteTrigger 背景執行，主 session 只回「收到，瀏覽器任務開始跑」。
+ralph-loop 一律走 RemoteTrigger 背景執行，主 session 只回「收到，開始跑，完成條件：<條件>」。
+frontend 任務一律開 Agent 子代理執行，主 session 只回「收到，UI 開始產出」。
 看到 URL 先查技能表，有對應技能就走技能，不要 WebFetch。
 
 ## 子代理紅線（核心層保護）
