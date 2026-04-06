@@ -38,8 +38,31 @@ async function runQmd(args: string[]): Promise<string> {
   return stdout.trim()
 }
 
+function extractDateFromBlock(block: string): string | null {
+  // Try path-based date: daily/2026-04-04/0107-session.md → [2026-04-04 01:07]
+  const dailyMatch = block.match(/daily\/(\d{4}-\d{2}-\d{2})\/(\d{2})(\d{2})-/)
+  if (dailyMatch) {
+    return `${dailyMatch[1]} ${dailyMatch[2]}:${dailyMatch[3]}`
+  }
+
+  // Try frontmatter date + time in context: date: 2026-04-04 / time: 01:08
+  const dateMatch = block.match(/date:\s*(\d{4}-\d{2}-\d{2})/)
+  const timeMatch = block.match(/time:\s*(\d{2}:\d{2})/)
+  if (dateMatch) {
+    return timeMatch ? `${dateMatch[1]} ${timeMatch[1]}` : dateMatch[1]
+  }
+
+  // Try filename date: 2026-04-06-norbert-wiener-...-dream.md
+  const fileMatch = block.match(/(\d{4}-\d{2}-\d{2})-[a-z]/)
+  if (fileMatch) {
+    return fileMatch[1]
+  }
+
+  return null
+}
+
 function formatResults(raw: string, maxResults: number): string {
-  // qmd output format: blocks separated by double newlines
+  // qmd output: blocks separated by double newlines
   // Each block has: path, title, score, context lines
   const blocks = raw.split(/\n\n+/).filter(b => b.trim())
   const limited = blocks.slice(0, maxResults)
@@ -48,7 +71,10 @@ function formatResults(raw: string, maxResults: number): string {
     return '搜尋無結果。'
   }
 
-  return limited.join('\n\n---\n\n')
+  return limited.map(block => {
+    const date = extractDateFromBlock(block)
+    return date ? `[${date}]\n${block}` : block
+  }).join('\n\n---\n\n')
 }
 
 // ── MCP Server ───────────────────────────────────────────────────────────────
