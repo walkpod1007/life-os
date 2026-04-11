@@ -5,7 +5,7 @@
 
 ENV_FILE="$HOME/.claude/channels/telegram/.env"
 LOG="$HOME/.claude/supervisor.log"
-SUPERVISOR="$HOME/Documents/Life-OS/scripts/claude-supervisor.sh"
+SUPERVISOR="$HOME/Documents/Life-OS/scripts/claude-telegram.sh"
 OFFSET_FILE="$HOME/.claude/channels/telegram/.tg_offset"
 LAST_ACTIVE_FILE="$HOME/.claude/channels/telegram/.last_active"
 

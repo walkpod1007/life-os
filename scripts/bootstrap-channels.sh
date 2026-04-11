@@ -177,22 +177,22 @@ else
   warn "telegram plugin 未安裝 → 在 Claude Code session 裡跑: /plugin install telegram@claude-plugins-official"
 fi
 
-# Telegram 跑在 claude-life session（主 session）
+# Telegram 跑在 claude-telegram session
 echo ""
-echo "── 5. claude-life session（主 session + Telegram）──"
+echo "── 5. claude-telegram session（Telegram bot 後端）──"
 
-if tmux has-session -t "claude-life" 2>/dev/null; then
-  ok "claude-life tmux session 存在"
-  CLAUDE_LIFE_PID=$(pgrep -f "claude.*plugin:telegram" 2>/dev/null | head -1)
-  if [ -n "$CLAUDE_LIFE_PID" ]; then
-    ok "claude-life 進程運行中 (PID $CLAUDE_LIFE_PID)"
+if tmux has-session -t "claude-telegram" 2>/dev/null; then
+  ok "claude-telegram tmux session 存在"
+  CLAUDE_TG_PID=$(pgrep -f "claude.*telegram-lobster" 2>/dev/null | head -1)
+  if [ -n "$CLAUDE_TG_PID" ]; then
+    ok "claude-telegram 進程運行中 (PID $CLAUDE_TG_PID)"
   else
-    warn "claude-life tmux 存在但 claude 進程不在"
-    echo "     → 手動啟動: bash $LIFE_OS/scripts/claude-supervisor.sh"
+    warn "claude-telegram tmux 存在但 claude 進程不在"
+    echo "     → 手動啟動: bash $LIFE_OS/scripts/claude-telegram.sh"
   fi
 else
-  warn "claude-life tmux session 不存在"
-  echo "     → 手動啟動: bash $LIFE_OS/scripts/claude-supervisor.sh"
+  warn "claude-telegram tmux session 不存在"
+  echo "     → 手動啟動: bash $LIFE_OS/scripts/claude-telegram.sh"
 fi
 
 # ──────────────────────────────────────────

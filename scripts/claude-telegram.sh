@@ -1,8 +1,8 @@
 #!/bin/bash
-TMUX_SESSION="claude-life"
+TMUX_SESSION="claude-telegram"
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-STOP_FLAG="$HOME/.claude/supervisor-stop"
-RESTART_FLAG="$HOME/.claude/supervisor-restart"
+STOP_FLAG="$HOME/.claude/telegram-supervisor-stop"
+RESTART_FLAG="$HOME/.claude/telegram-supervisor-restart"
 WORK_DIR="$HOME/Documents/Life-OS"
 LOG="$HOME/.claude/supervisor.log"
 
@@ -18,7 +18,7 @@ MIN_HEALTHY_SECS=60
 if [ -z "$TMUX" ]; then
   echo "$(date): 包進 tmux '$TMUX_SESSION'" >> "$LOG"
   tmux kill-session -t "$TMUX_SESSION" 2>/dev/null
-  tmux new-session -d -s "$TMUX_SESSION" "bash $HOME/Documents/Life-OS/scripts/claude-supervisor.sh"
+  tmux new-session -d -s "$TMUX_SESSION" "bash $HOME/Documents/Life-OS/scripts/claude-telegram.sh"
   echo "$(date): tmux session 已建立" >> "$LOG"
   exit 0
 fi
@@ -30,10 +30,10 @@ while true; do
   START_TS=$(date +%s)
 
   # Token watchdog (background) — 150k 自動重啟
-  bash "$HOME/Documents/Life-OS/scripts/token-watchdog.sh" &
+  bash "$HOME/Documents/Life-OS/scripts/token-watchdog.sh" "claude-telegram" &
   WATCHDOG_PID=$!
 
-  cd "$WORK_DIR" && claude --dangerously-skip-permissions --model opus --channels plugin:telegram@claude-plugins-official 2>>"$LOG"
+  cd "$WORK_DIR" && claude --model sonnet --strict-mcp-config --mcp-config "$WORK_DIR/config/mcp-life.json" 2>>"$LOG"
   EXIT_CODE=$?
   kill "$WATCHDOG_PID" 2>/dev/null
   END_TS=$(date +%s)
@@ -48,6 +48,13 @@ while true; do
   # Backoff logic: reset on healthy run, escalate on rapid failure
   NOW_TS=$(date +%s)
   if [ "$RUNTIME" -ge "$MIN_HEALTHY_SECS" ]; then
+    BACKOFF=5
+    FAIL_COUNT=0
+    LAST_FAIL_TS=0
+  elif [ -f "$RESTART_FLAG" ]; then
+    # 主動重啟（self-restart 觸發）不計入 fast-fail
+    echo "$(date): 主動重啟（RESTART_FLAG），不計 fast-fail (ran ${RUNTIME}s)" >> "$LOG"
+    rm -f "$RESTART_FLAG"
     BACKOFF=5
     FAIL_COUNT=0
     LAST_FAIL_TS=0
