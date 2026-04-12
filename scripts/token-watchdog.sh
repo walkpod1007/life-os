@@ -11,7 +11,14 @@ HOOKS_DIR="$REPO_ROOT/hooks"
 TMUX_TARGET="${1:-claude-telegram}"   # 接受參數，預設 claude-telegram
 THRESHOLD=150000
 CHECK_INTERVAL=60
-LOG="$HOME/.claude/supervisor.log"
+# log 跟對應 supervisor 寫同一個檔案，方便 debug 時看完整流程
+case "$TMUX_TARGET" in
+  claude-telegram) LOG="$HOME/.claude/claude-telegram.log" ;;
+  claude-line)     LOG="$HOME/.claude/claude-line.log" ;;
+  claude-remote)   LOG="$HOME/.claude/claude-remote.log" ;;
+  claude-terminal) LOG="$HOME/.claude/claude-terminal.log" ;;
+  *)               LOG="$HOME/.claude/supervisor.log" ;;
+esac
 SELF_RESTART="$SCRIPT_DIR/self-restart.sh"
 REALTIME_SUMMARY="$SCRIPT_DIR/realtime-summary.sh"
 TRIGGERED_FLAG="$HOME/.claude/watchdog-token-triggered-${TMUX_TARGET}"
@@ -24,31 +31,52 @@ PROJ_DIRS=(
 # 只看 mtime 在此秒數內有更新的 jsonl，避免舊 session 殘留 token 值誤觸發
 ACTIVE_WINDOW_SECS=600
 
-echo "$(date): token-watchdog 啟動 (threshold: ${THRESHOLD}k)" >> "$LOG"
+echo "$(date): token-watchdog[$TMUX_TARGET] 啟動 (threshold: ${THRESHOLD})" >> "$LOG"
 # 新 watchdog 代表新 session，清掉上一輪殘留的 triggered flag
 if [ -f "$TRIGGERED_FLAG" ]; then
     rm -f "$TRIGGERED_FLAG"
-    echo "$(date): token-watchdog 啟動時清除殘留 flag（新 session 乾淨開始）" >> "$LOG"
+    echo "$(date): token-watchdog[$TMUX_TARGET] 啟動時清除殘留 flag（新 session 乾淨開始）" >> "$LOG"
 fi
+
+# ── Session pinning：用 lsof 鎖定本 session claude 正在寫的 JSONL ──
+# watchdog 是 supervisor 的 background child，supervisor 也是 claude 的 parent。
+# 透過 PPID 找到同一個 supervisor 下的 claude，再用 lsof 找它開著的 .jsonl。
+PINNED_JSONL=""
+SUPERVISOR_PID="$PPID"  # watchdog 的 parent 就是 supervisor
 
 while true; do
     sleep "$CHECK_INTERVAL"
 
-    # 蒐集所有活躍 jsonl（mtime 在 ACTIVE_WINDOW_SECS 秒內有動）
-    ACTIVE_LIST=()
-    for dir in "${PROJ_DIRS[@]}"; do
-        [ -d "$dir" ] || continue
-        while IFS= read -r f; do
-            [ -n "$f" ] && ACTIVE_LIST+=("$f")
-        done < <(find "$dir" -maxdepth 1 -name "*.jsonl" -type f -mmin "-$((ACTIVE_WINDOW_SECS / 60 + 1))" 2>/dev/null)
-    done
+    # ── 如果尚未 pin，透過 lsof 找 claude 正在寫的 JSONL ──
+    if [ -z "$PINNED_JSONL" ]; then
+        CLAUDE_PID=$(pgrep -P "$SUPERVISOR_PID" -x claude 2>/dev/null | head -1)
+        if [ -n "$CLAUDE_PID" ]; then
+            # lsof 找 claude 開著的 .jsonl 檔案
+            CANDIDATE=$(lsof -p "$CLAUDE_PID" 2>/dev/null | grep '\.jsonl' | awk '{print $NF}' | head -1)
+            if [ -n "$CANDIDATE" ] && [ -f "$CANDIDATE" ]; then
+                PINNED_JSONL="$CANDIDATE"
+                echo "$(date): token-watchdog[$TMUX_TARGET] pinned JSONL (via lsof claude PID $CLAUDE_PID): $(basename "$PINNED_JSONL")" >> "$LOG"
+            fi
+        fi
+        [ -z "$PINNED_JSONL" ] && continue
+    fi
 
-    if [ "${#ACTIVE_LIST[@]}" -eq 0 ]; then
+    # ── 只監控 pinned JSONL ──
+    if [ ! -f "$PINNED_JSONL" ]; then
+        echo "$(date): token-watchdog[$TMUX_TARGET] pinned JSONL 消失，重置 pin" >> "$LOG"
+        PINNED_JSONL=""
         continue
     fi
 
-    # 掃所有活躍 jsonl，取最大的 context token 值跟對應檔案
-    read -r CURRENT_TOKENS TRANSCRIPT < <(python3 - "${ACTIVE_LIST[@]}" << 'PYEOF'
+    # 檢查 pinned file 是否還在活躍（mtime 在 ACTIVE_WINDOW 內）
+    MTIME=$(stat -f %m "$PINNED_JSONL" 2>/dev/null || echo 0)
+    NOW_TS=$(date +%s)
+    if [ $((NOW_TS - MTIME)) -gt "$ACTIVE_WINDOW_SECS" ]; then
+        continue  # session 靜默中，不需要檢查
+    fi
+
+    # 讀取 pinned JSONL 的 token 數
+    read -r CURRENT_TOKENS TRANSCRIPT < <(python3 - "$PINNED_JSONL" << 'PYEOF'
 import json, sys
 
 best_total = 0

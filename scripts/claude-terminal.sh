@@ -1,65 +1,77 @@
 #!/bin/bash
-TMUX_SESSION="claude-telegram"
-export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-STOP_FLAG="$HOME/.claude/telegram-supervisor-stop"
-RESTART_FLAG="$HOME/.claude/telegram-supervisor-restart"
-WORK_DIR="$HOME/Documents/Life-OS"
-LOG="$HOME/.claude/claude-telegram.log"
+# claude-terminal.sh — 終端機互動 session，跑在 Life-OS 目錄，帶 watchdog + supervisor
+# 用法：bash ~/Documents/Life-OS/scripts/claude-terminal.sh
+# alias claude 已指向此腳本
 
-# Backoff settings
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+WORK_DIR="$HOME/Documents/Life-OS"
+LOG="$HOME/.claude/claude-terminal.log"
+TMUX_TARGET="claude-terminal"
+STOP_FLAG="$HOME/.claude/terminal-supervisor-stop"
+RESTART_FLAG="$HOME/.claude/terminal-supervisor-restart"
+
 BACKOFF=5
 BACKOFF_MAX=300
 FAIL_COUNT=0
 FAIL_LIMIT=30
-FAIL_RESET_SECS=1800   # 30 分鐘無新失敗則歸零
+FAIL_RESET_SECS=1800
 LAST_FAIL_TS=0
 MIN_HEALTHY_SECS=60
 
-if [ -z "$TMUX" ]; then
-  echo "$(date): 包進 tmux '$TMUX_SESSION'" >> "$LOG"
-  tmux kill-session -t "$TMUX_SESSION" 2>/dev/null
-  tmux new-session -d -s "$TMUX_SESSION" "bash $HOME/Documents/Life-OS/scripts/claude-telegram.sh"
-  echo "$(date): tmux session 已建立" >> "$LOG"
-  exit 0
-fi
+SUPERVISOR_PID_FILE="$HOME/.claude/claude-terminal-supervisor.pid"
 
-echo "$(date): supervisor 在 tmux 內啟動" >> "$LOG"
+cd "$WORK_DIR" || exit 1
 rm -f "$STOP_FLAG"
+echo $$ > "$SUPERVISOR_PID_FILE"
+trap 'rm -f "$SUPERVISOR_PID_FILE"' EXIT INT TERM
+
+echo "$(date): claude-terminal supervisor 啟動 (PID $$)" >> "$LOG"
 
 while true; do
   START_TS=$(date +%s)
 
-  # Token watchdog (background) — 150k 自動重啟
-  bash "$HOME/Documents/Life-OS/scripts/token-watchdog.sh" "claude-telegram" &
+  # Token watchdog (background) — 150k 觸發 session-end + 重啟
+  bash "$HOME/Documents/Life-OS/scripts/token-watchdog.sh" "$TMUX_TARGET" &
   WATCHDOG_PID=$!
 
-  cd "$WORK_DIR" && claude --model sonnet --strict-mcp-config --mcp-config "$WORK_DIR/config/mcp-life.json" 2>>"$LOG"
+  echo "$(date): claude 啟動（watchdog PID $WATCHDOG_PID）" >> "$LOG"
+
+  command claude "$@"
   EXIT_CODE=$?
+
   kill "$WATCHDOG_PID" 2>/dev/null
   END_TS=$(date +%s)
   RUNTIME=$((END_TS - START_TS))
   echo "$(date): claude 結束 (exit $EXIT_CODE, ran ${RUNTIME}s)" >> "$LOG"
 
+  # 手動 /exit 或 stop flag → 不重啟
   if [ -f "$STOP_FLAG" ]; then
-    echo "$(date): stop flag，停止" >> "$LOG"
-    rm -f "$STOP_FLAG"; exit 0
+    echo "$(date): stop flag，停止 supervisor" >> "$LOG"
+    rm -f "$STOP_FLAG"
+    break
   fi
 
-  # Backoff logic: reset on healthy run, escalate on rapid failure
+  # exit 0 = 使用者主動離開，詢問是否重啟
+  if [ "$EXIT_CODE" -eq 0 ]; then
+    echo ""
+    echo "Claude session 結束。5 秒後自動重啟，按 Ctrl+C 取消..."
+    sleep 5 || { echo "$(date): 使用者取消重啟" >> "$LOG"; break; }
+  fi
+
+  # Backoff logic
   NOW_TS=$(date +%s)
   if [ "$RUNTIME" -ge "$MIN_HEALTHY_SECS" ]; then
     BACKOFF=5
     FAIL_COUNT=0
     LAST_FAIL_TS=0
   elif [ -f "$RESTART_FLAG" ]; then
-    # 主動重啟（self-restart 觸發）不計入 fast-fail
+    # 主動重啟（token-watchdog / session-end 觸發）不計入 fast-fail
     echo "$(date): 主動重啟（RESTART_FLAG），不計 fast-fail (ran ${RUNTIME}s)" >> "$LOG"
     rm -f "$RESTART_FLAG"
     BACKOFF=5
     FAIL_COUNT=0
     LAST_FAIL_TS=0
   else
-    # 冷卻歸零：距上次失敗超過 30 分鐘
     if [ "$LAST_FAIL_TS" -gt 0 ] && [ $((NOW_TS - LAST_FAIL_TS)) -ge "$FAIL_RESET_SECS" ]; then
       echo "$(date): 冷卻期滿，fail count 歸零" >> "$LOG"
       FAIL_COUNT=0
@@ -74,7 +86,7 @@ while true; do
     echo "$(date): 快速失敗 #${FAIL_COUNT}/${FAIL_LIMIT} (ran ${RUNTIME}s)" >> "$LOG"
     if [ "$FAIL_COUNT" -ge "$FAIL_LIMIT" ]; then
       echo "$(date): 連續 ${FAIL_LIMIT} 次快速失敗，supervisor 永久停止" >> "$LOG"
-      exit 1
+      break
     fi
   fi
 
@@ -83,5 +95,4 @@ while true; do
   sleep "$BACKOFF"
   stty sane 2>/dev/null
   echo "$(date): 重啟 claude..." >> "$LOG"
-  continue
 done

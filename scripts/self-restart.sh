@@ -33,13 +33,26 @@ case "$TARGET" in
     STOP_FLAG="$HOME/.claude/remote-supervisor-stop"
     LOCK_FILE="$HOME/.claude/self-restart-remote.lock"
     ;;
+  claude-terminal)
+    SUPERVISOR="$HOME/Documents/Life-OS/scripts/claude-terminal.sh"
+    RESTART_FLAG="$HOME/.claude/terminal-supervisor-restart"
+    STOP_FLAG="$HOME/.claude/terminal-supervisor-stop"
+    LOCK_FILE="$HOME/.claude/self-restart-terminal.lock"
+    ;;
   *)
-    echo "self-restart.sh: 未知 target '$TARGET'，支援 claude-telegram|claude-line|claude-remote" >&2
+    echo "self-restart.sh: 未知 target '$TARGET'，支援 claude-telegram|claude-line|claude-remote|claude-terminal" >&2
     exit 2
     ;;
 esac
 
-LOG="$HOME/.claude/supervisor.log"
+# log 跟對應 supervisor 寫同一個檔案
+case "$TARGET" in
+  claude-telegram) LOG="$HOME/.claude/claude-telegram.log" ;;
+  claude-line)     LOG="$HOME/.claude/claude-line.log" ;;
+  claude-remote)   LOG="$HOME/.claude/claude-remote.log" ;;
+  claude-terminal) LOG="$HOME/.claude/claude-terminal.log" ;;
+  *)               LOG="$HOME/.claude/supervisor.log" ;;
+esac
 mkdir -p "$HOME/.claude"
 
 # 1. 防止多個 self-restart 同時執行（per-session lock，mkdir atomic on macOS）
@@ -74,9 +87,27 @@ sleep 30
 touch "$RESTART_FLAG"
 rm -f "$STOP_FLAG"
 
-# 4. 確認 supervisor tmux session 存在
-if ! tmux -L default has-session -t "$TARGET" 2>/dev/null; then
-  echo "$(date): [$TARGET] ⚠️ tmux session 不存在，啟動新 supervisor" >> "$LOG"
+# 4. 定位 supervisor PID（tmux session 或 PID file）
+SUPERVISOR_PID=""
+if tmux -L default has-session -t "$TARGET" 2>/dev/null; then
+  SUPERVISOR_PID=$(tmux -L default list-panes -t "$TARGET" -F '#{pane_pid}' 2>/dev/null | head -1)
+  echo "$(date): [$TARGET] 透過 tmux pane_pid 定位 supervisor: $SUPERVISOR_PID" >> "$LOG"
+elif [ "$TARGET" = "claude-terminal" ]; then
+  # termi 不跑在 tmux，用 PID file 定位 supervisor
+  PID_FILE="$HOME/.claude/claude-terminal-supervisor.pid"
+  if [ -f "$PID_FILE" ]; then
+    SAVED_PID=$(cat "$PID_FILE")
+    if kill -0 "$SAVED_PID" 2>/dev/null; then
+      SUPERVISOR_PID="$SAVED_PID"
+      echo "$(date): [$TARGET] 透過 PID file 定位 supervisor: $SUPERVISOR_PID" >> "$LOG"
+    else
+      echo "$(date): [$TARGET] PID file 存在但進程 $SAVED_PID 已死" >> "$LOG"
+    fi
+  fi
+fi
+
+if [ -z "$SUPERVISOR_PID" ]; then
+  echo "$(date): [$TARGET] ⚠️ 找不到 supervisor，啟動新的" >> "$LOG"
   rm -f "$RESTART_FLAG"
   bash "$SUPERVISOR" &
   sleep 3
@@ -85,18 +116,15 @@ if ! tmux -L default has-session -t "$TARGET" 2>/dev/null; then
 fi
 
 # 5. 殺掉當前 claude 進程
-# 注意：claude CLI 啟動後會改寫 argv，ps 只看得到 "claude" 沒有 flags，
-# 所以不能靠 --mcp-config 檔名當 pgrep marker。改用 tmux pane_pid → ppid 樹定位：
-# pane_pid 就是 pane 裡的 supervisor bash，claude 是它的直接 child。
-PANE_PID=$(tmux -L default list-panes -t "$TARGET" -F '#{pane_pid}' 2>/dev/null | head -1)
-if [ -z "$PANE_PID" ]; then
-  echo "$(date): [$TARGET] 找不到 tmux pane_pid，supervisor loop 會自行重啟" >> "$LOG"
-  exit 0
+# 策略：先找直接子進程，找不到再遞迴搜子樹
+CLAUDE_PID=$(pgrep -P "$SUPERVISOR_PID" -x claude | head -1)
+if [ -z "$CLAUDE_PID" ]; then
+  # fallback: 找 supervisor 子樹中任何名為 claude 的進程
+  CLAUDE_PID=$(pgrep -g "$(ps -o pgid= -p "$SUPERVISOR_PID" | tr -d ' ')" -x claude 2>/dev/null | head -1)
+  [ -n "$CLAUDE_PID" ] && echo "$(date): [$TARGET] fallback: 透過 pgid 找到 claude PID $CLAUDE_PID" >> "$LOG"
 fi
-
-CLAUDE_PID=$(pgrep -P "$PANE_PID" -x claude | head -1)
 if [ -n "$CLAUDE_PID" ]; then
-  echo "$(date): [$TARGET] 送 TERM 給 claude PID $CLAUDE_PID (pane_pid=$PANE_PID)" >> "$LOG"
+  echo "$(date): [$TARGET] 送 TERM 給 claude PID $CLAUDE_PID (supervisor=$SUPERVISOR_PID)" >> "$LOG"
   kill -TERM "$CLAUDE_PID"
   # 等 10 秒優雅退出
   for _ in 1 2 3 4 5 6 7 8 9 10; do
@@ -112,5 +140,5 @@ if [ -n "$CLAUDE_PID" ]; then
     kill -KILL "$CLAUDE_PID"
   fi
 else
-  echo "$(date): [$TARGET] pane $PANE_PID 下找不到 claude child，supervisor loop 會自行重啟" >> "$LOG"
+  echo "$(date): [$TARGET] supervisor $SUPERVISOR_PID 下找不到 claude child，supervisor loop 會自行重啟" >> "$LOG"
 fi
