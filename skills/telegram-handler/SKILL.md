@@ -1,6 +1,10 @@
 ---
 name: telegram-handler
-description: 每次收到 Telegram 訊息時的標準前置處理。建立時間覺察與上下文感知，結果只供內部使用，不回報給用戶。使用時機：所有 Telegram 訊息到達時自動執行。
+description: >
+  每次收到 Telegram 訊息時的標準前置處理：建立時間覺察與上下文感知，結果只供內部使用，不回報給用戶。
+  觸發：所有 Telegram 訊息到達時最先執行，緊接在 dispatcher 之前。
+  不觸發：媒體路由（由 telegram-dispatcher 負責）、社交行為決策（由 telegram-behavior 負責）、訊息輸出（由 telegram-output 負責）。
+  消歧：此 skill 只做時間/context 前置計算，不做任何分流或回應決策。
 ---
 
 # Telegram Handler — 時間覺察前置處理
