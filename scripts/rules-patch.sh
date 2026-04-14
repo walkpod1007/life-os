@@ -18,6 +18,7 @@ VAULT="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/Obsidian Vaul
 PITFALL_DIR="$VAULT/80_apu/atoms/apu/pitfall"
 LOG_FILE="$LIFEOS/scripts/pipeline.log"
 PATCHED=0
+SKIPPED=0
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [rules-patch] $*" >> "$LOG_FILE"
@@ -168,14 +169,15 @@ ${EXISTING_RULES}
 
 這條新規則是否與某條現有規則描述同一件事？回覆 YES 或 NO，不要加解釋。"
 
-        DEDUP="$(claude --print --model haiku "$DEDUP_PROMPT" 2>/dev/null | tr -d '[:space:]')"
-        if [[ "$DEDUP" == "YES" ]]; then
+        DEDUP="$(claude --print --model haiku "$DEDUP_PROMPT" 2>/dev/null)"
+        if echo "$DEDUP" | grep -qi '^yes'; then
             DEDUP_ACTION="skip"
         fi
     fi
 
     if [[ "$DEDUP_ACTION" == "skip" ]]; then
         log "語意重複，跳過插入: $filename → ${CATEGORY}"
+        SKIPPED=$((SKIPPED + 1))
     else
         # ── insert rule into the correct section ──────────────────────
         python3 -c "
@@ -261,12 +263,14 @@ with open(path, 'w') as f:
     PATCHED=$((PATCHED + 1))
 done
 
-# ── git commit if anything changed ─────────────────────────────────────
+# ── git commit only when soul-behaviors.md was actually modified ────────
 if [[ "$PATCHED" -gt 0 ]]; then
     cd "$LIFEOS"
     git add soul-behaviors.md
-    git commit -m "auto: rules-patch — ${PATCHED} solidified pitfalls → soul-behaviors.md"
-    log "git commit 完成: ${PATCHED} 張固化卡片已路由至 soul-behaviors.md"
+    git commit -m "auto: rules-patch — ${PATCHED} new rules, ${SKIPPED} dedup-skipped → soul-behaviors.md"
+    log "git commit 完成: ${PATCHED} 新增, ${SKIPPED} 重複跳過"
+elif [[ "$SKIPPED" -gt 0 ]]; then
+    log "本次 ${SKIPPED} 張卡片已標記（語意重複，soul-behaviors.md 無變更）"
 else
     log "本次無卡片需要 patch"
 fi
