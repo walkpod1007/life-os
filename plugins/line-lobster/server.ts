@@ -14,7 +14,7 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
-import { readFileSync, chmodSync, existsSync, appendFileSync, writeFileSync } from 'fs'
+import { readFileSync, chmodSync, existsSync, appendFileSync, writeFileSync, statSync, unlinkSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 
@@ -29,9 +29,10 @@ try {
   }
 } catch {}
 
-const CHANNEL_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN ?? ''
-const LINE_API      = 'https://api.line.me/v2/bot/message'
-const QUEUE_FILE    = process.env.LINE_QUEUE_FILE ?? '/tmp/line-lobster-queue.jsonl'
+const CHANNEL_TOKEN  = process.env.LINE_CHANNEL_ACCESS_TOKEN ?? ''
+const LINE_API       = 'https://api.line.me/v2/bot/message'
+const QUEUE_FILE     = process.env.LINE_QUEUE_FILE ?? '/tmp/line-lobster-queue.jsonl'
+const DISABLE_PUSH   = process.env.LINE_DISABLE_PUSH === 'true'
 
 if (!CHANNEL_TOKEN) {
   process.stderr.write('[line-lobster/mcp] ERROR: missing LINE_CHANNEL_ACCESS_TOKEN\n')
@@ -174,6 +175,38 @@ function boostKeywords(newKeywords: ChannelKeyword[]): void {
   writeFileSync(FLAG_FILE, serializeFlag(channels))
 }
 
+// ── Media helpers ─────────────────────────────────────────────────────────────
+
+const MIME_MAP: Record<string, string> = {
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+  '.gif': 'image/gif', '.webp': 'image/webp',
+  '.avif': 'image/avif', '.heic': 'image/heic', '.heif': 'image/heif',
+  '.m4a': 'audio/mp4', '.mp4': 'video/mp4', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg',
+}
+
+function getMimeType(filePath: string): string {
+  const ext = filePath.includes('.') ? '.' + filePath.split('.').pop()!.toLowerCase() : ''
+  return MIME_MAP[ext] ?? 'application/octet-stream'
+}
+
+const CLAUDE_SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+
+function isImageMime(mime: string): boolean {
+  return CLAUDE_SUPPORTED_IMAGE_TYPES.has(mime)
+}
+
+function readMediaAsBase64(filePath: string): { data: string; mimeType: string } | null {
+  try {
+    if (!existsSync(filePath)) return null
+    const stat = statSync(filePath)
+    if (stat.size > 20 * 1024 * 1024) return null
+    const buf = readFileSync(filePath)
+    return { data: buf.toString('base64'), mimeType: getMimeType(filePath) }
+  } catch {
+    return null
+  }
+}
+
 // ── File-based queue ──────────────────────────────────────────────────────────
 
 type PendingMessage = {
@@ -185,12 +218,21 @@ type PendingMessage = {
   ts:         number
 }
 
+const REPLY_TOKEN_TTL_MS = 3 * 60 * 1000  // LINE reply token 約 1 分鐘，3 分鐘已確定過期
+
 function queueDrain(): PendingMessage[] {
   if (!existsSync(QUEUE_FILE)) return []
   const raw = readFileSync(QUEUE_FILE, 'utf8').trim()
   if (!raw) return []
   writeFileSync(QUEUE_FILE, '', 'utf8')
-  return raw.split('\n').filter(l => l.trim()).map(l => JSON.parse(l) as PendingMessage)
+  const now = Date.now()
+  return raw.split('\n').filter(l => l.trim()).map(l => JSON.parse(l) as PendingMessage).filter(m => {
+    if (now - m.ts > REPLY_TOKEN_TTL_MS) {
+      console.error(`[line-lobster] drop expired message (${Math.round((now - m.ts) / 60000)}m old): ${m.messageId}`)
+      return false
+    }
+    return true
+  })
 }
 
 function queueCount(): number {
@@ -238,7 +280,7 @@ message text
 
 1. Call get_pending to drain the queue
 2. Read ~/Documents/Life-OS/STATE.md for user context (近況/觀察)
-3. Reply using reply tool within 30s of get_pending — if expired, use push with the same user_id
+3. ALWAYS use reply tool first (within 30s of get_pending). Only use push as last resort if reply_token is expired. push costs quota — minimize its use. If push is unavoidable for a group message, use the group_id (not user_id) so it goes to the group chat, not a DM.
 4. Keep replies concise — read on mobile
 
 ## Context files
@@ -289,11 +331,12 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'push',
-      description: 'Push a message to a LINE user by user_id (no reply token needed).',
+      description: 'Push a message to a LINE user or group (no reply token needed). For group messages, pass group_id to send to the group chat; otherwise pass user_id to send a DM. group_id takes priority over user_id.',
       inputSchema: {
         type: 'object',
         properties: {
           user_id: { type: 'string' },
+          group_id: { type: 'string', description: 'Group ID — use this for group chat messages to send back to the group, not user DM' },
           text: { type: 'string' },
           quick_replies: {
             type: 'array',
@@ -301,7 +344,7 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
             description: 'Optional quick reply buttons',
           },
         },
-        required: ['user_id', 'text'],
+        required: ['text'],
       },
     },
     {
@@ -350,18 +393,33 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (req) => {
     if (msgs.length === 0) {
       return { content: [{ type: 'text', text: '<no pending LINE messages>' }] }
     }
-    const text = msgs
-      .map(m => {
-        const src = m.groupId ? `group_id="${m.groupId}" ` : ''
-        const time = new Date(m.ts).toLocaleString('zh-TW', {
-          timeZone: 'Asia/Taipei',
-          year: 'numeric', month: '2-digit', day: '2-digit',
-          hour: '2-digit', minute: '2-digit', hour12: false,
-        })
-        return `<line_message user_id="${m.userId}" ${src}reply_token="${m.replyToken}" ts="${m.ts}" time="${time}">\n${m.text}\n</line_message>`
+    const contentBlocks: any[] = []
+    for (const m of msgs) {
+      const src = (m as any).groupId ? `group_id="${(m as any).groupId}" ` : ''
+      const mediaAttr = (m as any).mediaType ? `media="${(m as any).mediaType}" ` : ''
+      const time = new Date(m.ts).toLocaleString('zh-TW', {
+        timeZone: 'Asia/Taipei',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false,
       })
-      .join('\n')
-    return { content: [{ type: 'text', text }] }
+      contentBlocks.push({
+        type: 'text',
+        text: `<line_message user_id="${m.userId}" ${src}${mediaAttr}reply_token="${m.replyToken}" ts="${m.ts}" time="${time}">\n${m.text}\n</line_message>`,
+      })
+
+      // Attach image inline if available
+      const mediaPath = (m as any).mediaPath
+      if (mediaPath) {
+        const media = readMediaAsBase64(mediaPath)
+        if (media && isImageMime(media.mimeType)) {
+          contentBlocks.push({ type: 'image', data: media.data, mimeType: media.mimeType })
+        } else if (media) {
+          contentBlocks.push({ type: 'text', text: `[附件: ${mediaPath} (${media.mimeType})]` })
+        }
+        try { unlinkSync(mediaPath) } catch {}
+      }
+    }
+    return { content: contentBlocks }
   }
 
   if (name === 'boost_keywords') {
@@ -411,11 +469,20 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (req) => {
     if (pushText == null || String(pushText).trim() === '' || String(pushText) === 'undefined') {
       return { content: [{ type: 'text', text: 'ERROR: text is empty or undefined — not sent. Please provide actual reply text.' }] }
     }
+    const groupId = args!.group_id as string | undefined
+    const userId  = args!.user_id  as string | undefined
+    if (DISABLE_PUSH && !groupId) {
+      return { content: [{ type: 'text', text: 'ERROR: push to user DM is disabled in this session. You must provide group_id to push back to the group chat.' }] }
+    }
+    const to = groupId || userId
+    if (!to) {
+      return { content: [{ type: 'text', text: 'ERROR: must provide group_id or user_id' }] }
+    }
     const msg: any = { type: 'text', text: String(pushText) }
     if (Array.isArray(args!.quick_replies) && args!.quick_replies.length > 0) {
       msg.quickReply = buildQuickReply(args!.quick_replies as string[])
     }
-    await linePost('/push', { to: args!.user_id, messages: [msg] })
+    await linePost('/push', { to, messages: [msg] })
     return { content: [{ type: 'text', text: 'sent' }] }
   }
 
