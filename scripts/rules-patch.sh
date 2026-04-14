@@ -14,6 +14,7 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:$PATH"
 # ── paths ──────────────────────────────────────────────────────────────
 LIFEOS="$HOME/Documents/Life-OS"
 SOUL_BEHAVIORS="$LIFEOS/soul-behaviors.md"
+SOUL_BEHAVIORS_BAK="${SOUL_BEHAVIORS}.bak"
 VAULT="$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/Obsidian Vault"
 PITFALL_DIR="$VAULT/80_apu/atoms/apu/pitfall"
 LOG_FILE="$LIFEOS/scripts/pipeline.log"
@@ -47,13 +48,24 @@ if [[ ${#CARDS[@]} -eq 0 ]]; then
     exit 0
 fi
 
+# ── category英文→中文對照表（CLAUDE.md 規格用英文，soul-behaviors.md 用中文）─
+declare -A CAT_EN_TO_ZH=(
+    ["dialogue"]="對話節奏"
+    ["tools"]="工具使用"
+    ["memory"]="記憶與脈絡"
+    ["system"]="系統操作"
+    ["channel"]="頻道行為"
+    ["boundary"]="邊界保護"
+    ["execution"]="執行判斷"
+)
+
 for card in "${CARDS[@]}"; do
     filename="$(basename "$card")"
     [[ "$filename" == "INDEX.md" ]] && continue
     [[ -f "$card" ]] || continue
 
-    # ── parse frontmatter ──────────────────────────────────────────────
-    read -r card_solidified card_rules_patched <<< "$(python3 -c "
+    # ── parse frontmatter（含 category 欄位）─────────────────────────
+    read -r card_solidified card_rules_patched card_category <<< "$(python3 -c "
 import sys
 lines = open(sys.argv[1], 'r').read().split('\n')
 in_fm = False
@@ -68,7 +80,7 @@ for line in lines:
     if in_fm and ':' in line:
         key, val = line.split(':', 1)
         fm[key.strip()] = val.strip()
-print(fm.get('solidified','false'), fm.get('rules_patched',''))
+print(fm.get('solidified','false'), fm.get('rules_patched',''), fm.get('category',''))
 " "$card" 2>/dev/null)"
 
     # ── filter: only solidified: true, not yet rules_patched ──────────
@@ -97,9 +109,25 @@ print(' '.join(body))
         continue
     fi
 
-    # ── ask Haiku: which soul-behaviors.md category + rule text ───────
-    CATEGORIES="對話節奏|工具使用|記憶與脈絡|系統操作|頻道行為|邊界保護|執行判斷"
-    PROMPT="以下是一張已固化的 pitfall 卡片內容：
+    # ── 快速路由：如果卡片有 category 欄位，直接映射跳過 Haiku ────────
+    CATEGORY=""
+    RULE_TEXT=""
+
+    if [[ -n "$card_category" ]] && [[ -n "${CAT_EN_TO_ZH[$card_category]+_}" ]]; then
+        CATEGORY="${CAT_EN_TO_ZH[$card_category]}"
+        log "快速路由（category 欄位）: $filename → $CATEGORY"
+        # 仍需 Haiku 生成規則文字（只跳過分類判斷）
+        RULE_PROMPT="以下是一張已固化的 pitfall 卡片內容：
+
+\"${BODY}\"
+
+用一句繁體中文寫出規則（格式：**關鍵詞**：說明。觸發條件盡量包含在關鍵詞裡）
+
+只回覆規則文字，不要加任何前綴或解釋。"
+        RULE_TEXT="$(claude --print --model haiku "$RULE_PROMPT" 2>/dev/null | head -1)"
+    else
+        # ── fallback: Haiku 同時判斷 category 和規則文字 ──────────────
+        PROMPT="以下是一張已固化的 pitfall 卡片內容：
 
 \"${BODY}\"
 
@@ -111,14 +139,13 @@ print(' '.join(body))
 CATEGORY: <類別>
 RULE: <規則文字>"
 
-    HAIKU_RESULT="$(claude --print --model haiku "$PROMPT" 2>/dev/null)"
+        HAIKU_RESULT="$(claude --print --model haiku "$PROMPT" 2>/dev/null)"
+        CATEGORY="$(echo "$HAIKU_RESULT" | grep '^CATEGORY:' | sed 's/^CATEGORY: *//')"
+        RULE_TEXT="$(echo "$HAIKU_RESULT" | grep '^RULE:' | sed 's/^RULE: *//')"
+    fi
 
-    CATEGORY="$(echo "$HAIKU_RESULT" | grep '^CATEGORY:' | sed 's/^CATEGORY: *//')"
-    RULE_TEXT="$(echo "$HAIKU_RESULT" | grep '^RULE:' | sed 's/^RULE: *//')"
-
-    # validate category
     if [[ -z "$CATEGORY" ]] || [[ -z "$RULE_TEXT" ]]; then
-        log "Haiku 格式錯誤，跳過: $filename"
+        log "無法取得 category 或 rule text，跳過: $filename"
         continue
     fi
 
@@ -179,12 +206,15 @@ ${EXISTING_RULES}
         log "語意重複，跳過插入: $filename → ${CATEGORY}"
         SKIPPED=$((SKIPPED + 1))
     else
+        # ── backup before write ────────────────────────────────────────
+        cp "$SOUL_BEHAVIORS" "$SOUL_BEHAVIORS_BAK"
+
         # ── insert rule into the correct section ──────────────────────
         python3 -c "
 import sys
 
 soul_path = sys.argv[1]
-section_keyword = sys.argv[2]  # e.g. '## 對話節奏'
+section_keyword = sys.argv[2]
 new_rule = sys.argv[3]
 
 with open(soul_path, 'r') as f:
@@ -203,8 +233,6 @@ for i, line in enumerate(lines):
             in_target_section = True
         else:
             if in_target_section:
-                # We've left the target section without inserting — shouldn't happen
-                # but just in case, insert before next section
                 new_lines.insert(len(new_lines)-1, '- ' + new_rule)
                 new_lines.insert(len(new_lines)-1, '')
                 inserted = True
@@ -212,7 +240,6 @@ for i, line in enumerate(lines):
 
     # Insert before the '---' separator that ends the section
     if in_target_section and not inserted and line.strip() == '---':
-        # Remove the last '---' we just appended, insert rule before it
         new_lines.pop()
         new_lines.append('- ' + new_rule)
         new_lines.append('')
@@ -220,8 +247,15 @@ for i, line in enumerate(lines):
         inserted = True
         in_target_section = False
 
+# EOF fallback: still in target section (last section, ends with ---)
+if not inserted and in_target_section:
+    while new_lines and new_lines[-1].strip() == '':
+        new_lines.pop()
+    new_lines.append('')
+    new_lines.append('- ' + new_rule)
+    inserted = True
+
 if not inserted:
-    # Fallback: just append to end of file before the last section
     new_lines.append('')
     new_lines.append('- ' + new_rule)
 
@@ -229,9 +263,10 @@ with open(soul_path, 'w') as f:
     f.write('\n'.join(new_lines))
 " "$SOUL_BEHAVIORS" "$SECTION_HEADER" "$RULE_TEXT"
         log "插入新規則到 ${CATEGORY}: $filename"
+        PATCHED=$((PATCHED + 1))
     fi
 
-    # ── mark card as rules_patched ─────────────────────────────────────
+    # ── mark card as rules_patched（skip 也要標，避免明天重複判斷）────
     python3 -c "
 import sys
 path = sys.argv[1]
@@ -260,7 +295,6 @@ with open(path, 'w') as f:
     f.write('\n'.join(new_lines))
 " "$card" "$CATEGORY"
 
-    PATCHED=$((PATCHED + 1))
 done
 
 # ── git commit only when soul-behaviors.md was actually modified ────────
@@ -269,10 +303,12 @@ if [[ "$PATCHED" -gt 0 ]]; then
     git add soul-behaviors.md
     git commit -m "auto: rules-patch — ${PATCHED} new rules, ${SKIPPED} dedup-skipped → soul-behaviors.md"
     log "git commit 完成: ${PATCHED} 新增, ${SKIPPED} 重複跳過"
+    rm -f "$SOUL_BEHAVIORS_BAK"
 elif [[ "$SKIPPED" -gt 0 ]]; then
     log "本次 ${SKIPPED} 張卡片已標記（語意重複，soul-behaviors.md 無變更）"
+    rm -f "$SOUL_BEHAVIORS_BAK"
 else
     log "本次無卡片需要 patch"
 fi
 
-log "=== rules-patch 結束 (patched: ${PATCHED}) ==="
+log "=== rules-patch 結束 (patched: ${PATCHED}, skipped: ${SKIPPED}) ==="
