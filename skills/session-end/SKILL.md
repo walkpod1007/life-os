@@ -1,6 +1,6 @@
 ---
 name: session-end
-description: Session 結束收尾流程：補尾段摘要 → 更新向量索引 → 寫 MEMORY.md 交接卡 → 存 handoff 工單 → 自重啟。使用時機：要換 session、結束工作、/session-end、寫日檔。
+description: Session 結束收尾流程：補尾段摘要 → 更新向量索引 → 寫 handoff.md → 判斷里程碑 → 自重啟。使用時機：要換 session、結束工作、/session-end、寫日檔。
 ---
 
 # Session End
@@ -17,8 +17,10 @@ description: Session 結束收尾流程：補尾段摘要 → 更新向量索引
 2. 更新 Life-OS 向量索引
    `python3 ~/Documents/Life-OS/scripts/lifeos-index-update.py`
 
-3. 寫 MEMORY.md 交接卡
-   建立 memory/project_YYYY_MM_DD_handoff.md，append 到 MEMORY.md index
+3. 寫 handoff.md（覆寫式交接卡）
+   覆寫 ~/Documents/Life-OS/handoff.md，格式四段：SUMMARY / CURRENT / NEXT / LESSON
+   ⛔ 禁止寫入 memory/ 目錄。如有值得長期保存的 feedback/project/reference 洞察，
+   另建對應型別的 memory 卡片（選做，不是必做流程）。
 
 4. 判斷里程碑 → 追加 CHANGELOG.md
    問自己：「這次 session 有完成系統級的基礎建設或變更嗎？下一個我需要知道這件事存在嗎？」
@@ -40,7 +42,7 @@ Session 收尾完成 ✓
 
 📝 YYYY-MM-DD-HHMM-summary.md 寫入
 🔢 Life-OS 向量：N 個入庫
-🧠 MEMORY.md 交接卡更新
+📋 handoff.md 覆寫完成
 📋 handoff 工單存檔
 
 待辦帶去下個 session：
