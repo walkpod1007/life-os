@@ -150,6 +150,17 @@ RULE: <規則文字>"
     fi
 
     # map category → soul-behaviors.md section header
+    # normalize English → Chinese if Haiku slips into English
+    case "$CATEGORY" in
+        "dialogue")   CATEGORY="對話節奏" ;;
+        "tools")      CATEGORY="工具使用" ;;
+        "memory")     CATEGORY="記憶與脈絡" ;;
+        "system")     CATEGORY="系統操作" ;;
+        "channel")    CATEGORY="頻道行為" ;;
+        "boundary")   CATEGORY="邊界保護" ;;
+        "execution")  CATEGORY="執行判斷" ;;
+    esac
+
     case "$CATEGORY" in
         "對話節奏")     SECTION_HEADER="## 對話節奏" ;;
         "工具使用")     SECTION_HEADER="## 工具使用" ;;
