@@ -312,3 +312,87 @@ else
 fi
 
 log "=== rules-patch 結束 (patched: ${PATCHED}, skipped: ${SKIPPED}) ==="
+
+# ── regenerate pitfall-digest.md ──────────────────────────────────────
+DIGEST_OUT="$HOME/.claude/pitfall-digest.md"
+
+python3 - "$PITFALL_DIR" "$DIGEST_OUT" <<'PYEOF'
+import sys, os, re
+from collections import defaultdict
+
+pitfall_dir = sys.argv[1]
+output_path = sys.argv[2]
+
+CAT_ORDER = ["對話節奏", "工具使用", "記憶與脈絡", "系統操作", "頻道行為", "邊界保護", "執行判斷", "其他"]
+CAT_EN = {"dialogue":"對話節奏","tools":"工具使用","memory":"記憶與脈絡",
+          "system":"系統操作","channel":"頻道行為","boundary":"邊界保護","execution":"執行判斷"}
+
+groups = defaultdict(list)
+
+for fname in sorted(os.listdir(pitfall_dir)):
+    if not fname.endswith('.md') or fname == 'INDEX.md':
+        continue
+    path = os.path.join(pitfall_dir, fname)
+    with open(path, 'r') as f:
+        content = f.read()
+
+    lines = content.split('\n')
+    in_fm = False
+    fm = {}
+    body_start = 0
+    for i, line in enumerate(lines):
+        if line.strip() == '---':
+            if not in_fm:
+                in_fm = True
+                continue
+            else:
+                body_start = i + 1
+                break
+        if in_fm and ':' in line:
+            k, v = line.split(':', 1)
+            fm[k.strip()] = v.strip()
+
+    if fm.get('solidified', 'false') != 'true':
+        continue
+
+    # extract first meaningful sentence of body
+    body_lines = [l.strip() for l in lines[body_start:] if l.strip() and not l.strip().startswith('## ')]
+    if not body_lines:
+        continue
+    first_line = body_lines[0]
+    # truncate at first sentence end or 80 chars
+    sentence = re.split(r'[。\.！!；;]', first_line)[0].strip()
+    if len(sentence) > 80:
+        sentence = sentence[:77] + '...'
+    if not sentence:
+        continue
+
+    # determine category
+    cat_en = fm.get('category', '')
+    cat_zh = CAT_EN.get(cat_en, fm.get('rules_patched', '其他') or '其他')
+    if cat_zh not in CAT_ORDER:
+        cat_zh = '其他'
+
+    groups[cat_zh].append(sentence)
+
+# write digest
+lines_out = [
+    "# pitfall-digest — 固化踩坑速查",
+    f"> 自動生成 by rules-patch.sh。只含 solidified: true 的卡片。共 {sum(len(v) for v in groups.values())} 條。",
+    ""
+]
+for cat in CAT_ORDER:
+    if cat not in groups:
+        continue
+    lines_out.append(f"## {cat}")
+    for rule in groups[cat]:
+        lines_out.append(f"- {rule}")
+    lines_out.append("")
+
+with open(output_path, 'w') as f:
+    f.write('\n'.join(lines_out))
+
+print(f"digest: {sum(len(v) for v in groups.values())} rules → {output_path}")
+PYEOF
+
+log "pitfall-digest.md 更新完成"

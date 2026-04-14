@@ -23,6 +23,8 @@
 
 @/Users/applyao/Documents/life-os/handoff.md
 
+@/Users/applyao/.claude/pitfall-digest.md
+
 @/Users/applyao/Documents/life-os/.claude/capabilities.md
 
 ## 技能路由
