@@ -26,6 +26,17 @@ LAST_FAIL_TS=0
 MIN_HEALTHY_SECS=60
 REMOTE_CONTROL_DELAY=8   # 秒，等 claude CLI 就緒後自動 /remote-control
 
+# 巢狀 supervisor 防護：禁止從 tmux pane 內部建立第二個 supervisor
+if [ -n "$TMUX" ]; then
+  _CURRENT_SESSION=$(tmux display-message -p '#S' 2>/dev/null)
+  if [ "$_CURRENT_SESSION" = "$TMUX_SESSION" ]; then
+    echo "ERROR: 已在 tmux session '$TMUX_SESSION' 內部，拒絕建立巢狀 supervisor。" >&2
+    echo "若要重啟，請用 self-restart.sh 或從 tmux 外部執行。" >&2
+    exit 1
+  fi
+  unset _CURRENT_SESSION
+fi
+
 if [ -z "$TMUX" ]; then
   echo "$(date): wrapping into tmux '$TMUX_SESSION'" >> "$LOG"
   tmux kill-session -t "$TMUX_SESSION" 2>/dev/null
@@ -35,7 +46,10 @@ if [ -z "$TMUX" ]; then
   exit 0
 fi
 
-echo "$(date): plan supervisor started inside tmux" >> "$LOG"
+SUPERVISOR_PID_FILE="$HOME/.claude/claude-remote-supervisor.pid"
+echo $$ > "$SUPERVISOR_PID_FILE"
+trap 'rm -f "$SUPERVISOR_PID_FILE"' EXIT INT TERM
+echo "$(date): remote supervisor started inside tmux (PID $$)" >> "$LOG"
 rm -f "$STOP_FLAG"
 
 while true; do
