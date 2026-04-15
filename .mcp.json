@@ -4,18 +4,6 @@
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp"]
     },
-    "line-lobster": {
-      "command": "/opt/homebrew/bin/bun",
-      "args": [
-        "/Users/Modema11434/Documents/Life-OS/plugins/line-lobster/server.ts"
-      ]
-    },
-    "telegram-lobster": {
-      "command": "/opt/homebrew/bin/bun",
-      "args": [
-        "/Users/Modema11434/Documents/Life-OS/plugins/telegram-lobster/server.ts"
-      ]
-    },
     "playwright": {
       "command": "npx",
       "args": ["@playwright/mcp"],
@@ -24,8 +12,8 @@
     "qmd-search": {
       "command": "/opt/homebrew/bin/bun",
       "args": [
-        "/Users/Modema11434/Documents/Life-OS/plugins/qmd-search/server.ts"
+        "/Users/applyao/Documents/Life-OS/plugins/qmd-search/server.ts"
       ]
-    }
+    },
   }
 }

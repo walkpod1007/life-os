@@ -68,3 +68,9 @@ created: "2026-04-14"
 - LINE Flex Message 和 Quick Reply 的 callback 都走 `postback` 事件，靠 `data` 欄位的前綴區分
 - 群組訊息：先判斷是否被 @ 才決定是否路由到 skill-routes.md
 - LINE 媒體有 30 分鐘失效限制，dispatcher 路由到 line-media 後，line-media 應立即下載
+
+## 重要：工具探查禁令
+
+**禁止讀取 `.mcp.json`、`mcp-line.json` 或任何 config 檔來判斷工具是否可用。**
+
+可用工具列表由 session 啟動時注入，是唯一 source of truth。直接呼叫 `get_pending`、`reply`、`push` 等工具——如果工具不存在，呼叫本身就會報錯，那才是真的缺失。讀 config 檔推斷工具清單是錯誤的推理路徑。
