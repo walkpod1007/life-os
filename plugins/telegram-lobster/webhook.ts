@@ -166,18 +166,21 @@ function shouldNotify(): boolean {
 }
 
 function notifyTmux(): void {
-  Bun.spawn(
-    ['tmux', 'send-keys', '-t', TMUX_SESSION, TMUX_MSG, 'Enter'],
-    { stdout: 'ignore', stderr: 'pipe' }
-  ).exited.then(code => {
-    if (code !== 0) {
-      process.stderr.write(
-        `[tg-lobster/webhook] WARN: tmux session "${TMUX_SESSION}" not found (code ${code})\n`
-      )
-    }
-  }).catch(err => {
-    process.stderr.write(`[tg-lobster/webhook] WARN: tmux notify error: ${err}\n`)
-  })
+  // 不直接送，改成背景 shell 等 pane 就緒後再送
+  const TMUX_MSG_ESCAPED = TMUX_MSG.replace(/'/g, "'\\''")
+  const script = `
+    for i in 1 2 3 4 5 6; do
+      pane=$(tmux capture-pane -t '${TMUX_SESSION}' -p 2>/dev/null | tail -3)
+      if echo "$pane" | grep -q '❯'; then
+        tmux send-keys -t '${TMUX_SESSION}' '${TMUX_MSG_ESCAPED}' Enter
+        exit 0
+      fi
+      sleep 3
+    done
+    # 18 秒後還沒就緒，還是送一次
+    tmux send-keys -t '${TMUX_SESSION}' '${TMUX_MSG_ESCAPED}' Enter
+  `
+  Bun.spawn(['bash', '-c', script], { stdout: 'ignore', stderr: 'ignore' })
 }
 
 // ── HTTP Server ───────────────────────────────────────────────────────────────
