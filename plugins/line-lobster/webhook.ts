@@ -263,7 +263,7 @@ const COOLDOWN_MS = 30_000  // 30 秒內每個 session 只送一次觸發語
 function cooldownFileFor(session: string): string {
   // Sanitize session name to prevent path traversal, then namespace per-session
   const safe = session.replace(/[^a-zA-Z0-9_-]/g, '_')
-  return join(LINE_RUNTIME_DIR, `tg-trigger-cooldown-${safe}`)
+  return join(LINE_RUNTIME_DIR, `line-trigger-cooldown-${safe}`)
 }
 
 function shouldNotify(session: string): boolean {
