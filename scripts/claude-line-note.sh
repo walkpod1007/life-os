@@ -59,8 +59,18 @@ while true; do
       QUEUE_SIZE=$(wc -l < "$QUEUE_FILE" 2>/dev/null || echo 0)
       QUEUE_SIZE=$(echo "$QUEUE_SIZE" | tr -d ' ')
       if [ "${QUEUE_SIZE:-0}" -gt 0 ]; then
-        tmux send-keys -t "$TMUX_SESSION" "請呼叫 get_pending 讀取待處理的 LINE 訊息並回覆。" Enter
-        echo "$(date): auto-sent get_pending trigger (queue=${QUEUE_SIZE}B)" >> "$LOG"
+        # 共用 cooldown：與 webhook 的 line-trigger-cooldown 同步，30 秒內不重複送
+        COOLDOWN_FILE="$HOME/.claude/channels/line/runtime/line-trigger-cooldown-claude-line-note"
+        NOW_MS=$(date +%s%3N)
+        LAST_MS=0
+        [ -f "$COOLDOWN_FILE" ] && LAST_MS=$(cat "$COOLDOWN_FILE" 2>/dev/null || echo 0)
+        if [ $((NOW_MS - LAST_MS)) -lt 30000 ]; then
+          echo "$(date): auto-trigger skipped (cooldown active)" >> "$LOG"
+        else
+          echo "$NOW_MS" > "$COOLDOWN_FILE"
+          tmux send-keys -t "$TMUX_SESSION" "請呼叫 get_pending 讀取待處理的 LINE 訊息並回覆。" Enter
+          echo "$(date): auto-sent get_pending trigger (queue=${QUEUE_SIZE}B)" >> "$LOG"
+        fi
       else
         echo "$(date): auto-trigger skipped (queue empty)" >> "$LOG"
       fi
