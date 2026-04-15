@@ -55,8 +55,16 @@ while true; do
       sleep 5
     done
     if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
-      tmux send-keys -t "$TMUX_SESSION" "請呼叫 get_pending 讀取待處理的 Telegram 訊息並回覆。" Enter
-      echo "$(date): auto-sent get_pending trigger" >> "$LOG"
+      # 只在 queue 非空時才送觸發語，避免與 webhook 觸發疊加
+      QUEUE_FILE="$HOME/.claude/channels/telegram/runtime/tg-queue.jsonl"
+      QUEUE_SIZE=$(wc -c < "$QUEUE_FILE" 2>/dev/null || echo 0)
+      QUEUE_SIZE=$(echo "$QUEUE_SIZE" | tr -d ' ')
+      if [ "${QUEUE_SIZE:-0}" -gt 0 ]; then
+        tmux send-keys -t "$TMUX_SESSION" "請呼叫 get_pending 讀取待處理的 Telegram 訊息並回覆。" Enter
+        echo "$(date): auto-sent get_pending trigger (queue=${QUEUE_SIZE}B)" >> "$LOG"
+      else
+        echo "$(date): auto-trigger skipped (queue empty)" >> "$LOG"
+      fi
     fi
   ) &
   TRIGGER_PID=$!
