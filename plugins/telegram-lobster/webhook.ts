@@ -202,11 +202,13 @@ Bun.serve({
       return new Response('method not allowed', { status: 405 })
     }
 
-    // Validate secret token header
-    const headerSecret = req.headers.get('x-telegram-bot-api-secret-token') ?? ''
-    if (headerSecret !== SECRET_TOKEN) {
-      process.stderr.write('[tg-lobster/webhook] invalid secret token\n')
-      return new Response('Forbidden', { status: 403 })
+    // Validate secret token header (skip if TG_WEBHOOK_SECRET not configured)
+    if (SECRET_TOKEN !== '') {
+      const headerSecret = req.headers.get('x-telegram-bot-api-secret-token') ?? ''
+      if (headerSecret !== SECRET_TOKEN) {
+        process.stderr.write('[tg-lobster/webhook] invalid secret token\n')
+        return new Response('Forbidden', { status: 403 })
+      }
     }
 
     let update: any
