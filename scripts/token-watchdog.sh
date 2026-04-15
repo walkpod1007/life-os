@@ -97,7 +97,28 @@ while true; do
             QUEUE_MTIME=$(stat -f %m "$HEALTH_QUEUE" 2>/dev/null || echo 0)
             if [ "$QUEUE_SIZE" -gt 0 ] && [ $((NOW_HC - QUEUE_MTIME)) -gt "$QUEUE_STALE_SECS" ]; then
                 echo "$(date): health-check[$TMUX_TARGET] ⚠️ queue 積壓 ${QUEUE_SIZE}B / $((NOW_HC - QUEUE_MTIME))s，補觸發" >> "$LOG"
-                [ -n "$HEALTH_TRIGGER" ] && tmux send-keys -t "$TMUX_TARGET" "$HEALTH_TRIGGER" Enter 2>/dev/null
+                # 共用 cooldown，與 webhook 同步
+                TRIGGER_COOLDOWN_FILE=""
+                case "$HEALTH_QUEUE" in
+                  *tg-queue.jsonl) TRIGGER_COOLDOWN_FILE="$HOME/.claude/channels/telegram/runtime/tg-trigger-cooldown" ;;
+                  *line-lobster-queue.jsonl) TRIGGER_COOLDOWN_FILE="$HOME/.claude/channels/line/runtime/line-trigger-cooldown-claude-line" ;;
+                  *line-lobster-queue-line-note.jsonl) TRIGGER_COOLDOWN_FILE="$HOME/.claude/channels/line/runtime/line-trigger-cooldown-claude-line-note" ;;
+                esac
+                SHOULD_TRIGGER=1
+                if [ -n "$TRIGGER_COOLDOWN_FILE" ]; then
+                  NOW_MS=$(date +%s%3N)
+                  LAST_MS=0
+                  [ -f "$TRIGGER_COOLDOWN_FILE" ] && LAST_MS=$(cat "$TRIGGER_COOLDOWN_FILE" 2>/dev/null || echo 0)
+                  if [ $((NOW_MS - LAST_MS)) -lt 30000 ]; then
+                    echo "$(date): health-check[$TMUX_TARGET] trigger skipped (cooldown active)" >> "$LOG"
+                    SHOULD_TRIGGER=0
+                  else
+                    echo "$NOW_MS" > "$TRIGGER_COOLDOWN_FILE"
+                  fi
+                fi
+                if [ "$SHOULD_TRIGGER" = "1" ] && [ -n "$HEALTH_TRIGGER" ]; then
+                  tmux send-keys -t "$TMUX_TARGET" "$HEALTH_TRIGGER" Enter 2>/dev/null
+                fi
             fi
         fi
 
