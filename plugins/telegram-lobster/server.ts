@@ -155,6 +155,19 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
+      name: 'edit_message',
+      description: 'Edit text of a previously-sent bot message. Use for incremental progress updates instead of spamming new messages. Bot can only edit its own messages.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          chat_id:    { type: 'string', description: 'Target chat ID (string form to handle large IDs)' },
+          message_id: { type: 'number', description: 'Message ID of the bot message to edit' },
+          text:       { type: 'string', description: 'New message text' },
+        },
+        required: ['chat_id', 'message_id', 'text'],
+      },
+    },
+    {
       name: 'react',
       description: 'Add an emoji reaction to a Telegram message. Telegram only accepts specific emojis from its whitelist (e.g. 👍 ❤️ 🔥 ✅ 👀 🎉). Useful to ack receipt without sending a reply.',
       inputSchema: {
@@ -224,6 +237,17 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const { chat_id, message_id, text } = args as { chat_id: number; message_id: number; text: string }
     await tgApiCall('sendMessage', { chat_id, text, reply_to_message_id: message_id })
     return { content: [{ type: 'text', text: `replied to message ${message_id} in chat ${chat_id}` }] }
+  }
+
+  if (name === 'edit_message') {
+    const { chat_id, message_id, text } = args as { chat_id: string; message_id: number; text: string }
+    await tgApiCall('editMessageText', {
+      chat_id,
+      message_id,
+      text,
+      parse_mode: 'HTML',
+    })
+    return { content: [{ type: 'text', text: `edited message ${message_id} in chat ${chat_id}` }] }
   }
 
   if (name === 'react') {
