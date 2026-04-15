@@ -258,6 +258,27 @@ function queueCount(): Record<string, number> {
 
 // ── tmux notification (fire-and-forget) ───────────────────────────────────────
 
+const COOLDOWN_MS = 30_000  // 30 秒內每個 session 只送一次觸發語
+
+function cooldownFileFor(session: string): string {
+  // Sanitize session name to prevent path traversal, then namespace per-session
+  const safe = session.replace(/[^a-zA-Z0-9_-]/g, '_')
+  return join(LINE_RUNTIME_DIR, `tg-trigger-cooldown-${safe}`)
+}
+
+function shouldNotify(session: string): boolean {
+  const file = cooldownFileFor(session)
+  const now = Date.now()
+  try {
+    if (existsSync(file)) {
+      const last = parseInt(readFileSync(file, 'utf8'))
+      if (!isNaN(last) && now - last < COOLDOWN_MS) return false
+    }
+  } catch {}
+  try { writeFileSync(file, String(now), 'utf8') } catch {}
+  return true
+}
+
 function notifyTmux(session: string): void {
   Bun.spawn(
     ['tmux', 'send-keys', '-t', session, TMUX_MSG, 'Enter'],
@@ -394,9 +415,13 @@ Bun.serve({
       const preview = text.slice(0, 60) + (mediaType ? ` [${mediaType}]` : '')
       process.stderr.write(`[line-lobster/webhook] queued → ${session}: ${preview}\n`)
 
-      // 4. Notify session once per webhook call
+      // 4. Notify session once per webhook call, honoring 30s cooldown
       if (!notifiedSessions.has(session)) {
-        notifyTmux(session)
+        if (shouldNotify(session)) {
+          notifyTmux(session)
+        } else {
+          process.stderr.write(`[line-lobster/webhook] notify skipped for ${session} (cooldown)\n`)
+        }
         notifiedSessions.add(session)
       }
     }
