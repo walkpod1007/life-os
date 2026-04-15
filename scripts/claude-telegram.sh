@@ -36,9 +36,17 @@ while true; do
   bash "$HOME/Documents/Life-OS/scripts/token-watchdog.sh" "claude-telegram" &
   WATCHDOG_PID=$!
 
-  # 重啟後主動排水 — 不等 webhook 觸發才醒
+  # 重啟後主動排水 — 等 Claude 穩定後才送，避免與 webhook 觸發疊加
   (
     sleep 25
+    # 再等一下，確認 pane 已顯示 prompt 而非還在渲染
+    for i in 1 2 3; do
+      PANE_NOW=$(tmux capture-pane -t "$TMUX_SESSION" -p 2>/dev/null | tail -3)
+      if echo "$PANE_NOW" | grep -q "❯"; then
+        break
+      fi
+      sleep 5
+    done
     if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
       tmux send-keys -t "$TMUX_SESSION" "請呼叫 get_pending 讀取待處理的 Telegram 訊息並回覆。" Enter
       echo "$(date): auto-sent get_pending trigger" >> "$LOG"
