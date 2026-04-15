@@ -23,7 +23,10 @@ if [ -z "$TMUX" ]; then
   exit 0
 fi
 
-echo "$(date): supervisor 在 tmux 內啟動" >> "$LOG"
+SUPERVISOR_PID_FILE="$HOME/.claude/claude-telegram-supervisor.pid"
+echo $$ > "$SUPERVISOR_PID_FILE"
+trap 'rm -f "$SUPERVISOR_PID_FILE"' EXIT INT TERM
+echo "$(date): supervisor 在 tmux 內啟動 (PID $$)" >> "$LOG"
 rm -f "$STOP_FLAG"
 
 while true; do
@@ -33,9 +36,19 @@ while true; do
   bash "$HOME/Documents/Life-OS/scripts/token-watchdog.sh" "claude-telegram" &
   WATCHDOG_PID=$!
 
+  # 重啟後主動排水 — 不等 webhook 觸發才醒
+  (
+    sleep 10
+    if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
+      tmux send-keys -t "$TMUX_SESSION" "請呼叫 get_pending 讀取待處理的 Telegram 訊息並回覆。" Enter
+      echo "$(date): auto-sent get_pending trigger" >> "$LOG"
+    fi
+  ) &
+  TRIGGER_PID=$!
+
   cd "$WORK_DIR" && claude --model sonnet --strict-mcp-config --mcp-config "$WORK_DIR/config/mcp-life.json" 2>>"$LOG"
   EXIT_CODE=$?
-  kill "$WATCHDOG_PID" 2>/dev/null
+  kill "$WATCHDOG_PID" "$TRIGGER_PID" 2>/dev/null
   END_TS=$(date +%s)
   RUNTIME=$((END_TS - START_TS))
   echo "$(date): claude 結束 (exit $EXIT_CODE, ran ${RUNTIME}s)" >> "$LOG"
