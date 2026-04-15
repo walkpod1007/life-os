@@ -313,29 +313,24 @@ Bun.serve({
       if (event.type !== 'message') continue
       const msgType = event.message?.type
 
-      // Build text and detect media type
+      // Build text and detect media type (download happens after allowlist check below)
       let text = ''
       let mediaType: string | null = null
-      let mediaPath: string | null = null
 
       if (msgType === 'text') {
         text = event.message.text
       } else if (msgType === 'image') {
         mediaType = 'image'
         text = '[照片]'
-        mediaPath = await downloadLineContent(event.message.id, 'image')
       } else if (msgType === 'video') {
         mediaType = 'video'
         text = '[影片]'
-        mediaPath = await downloadLineContent(event.message.id, 'video')
       } else if (msgType === 'audio') {
         mediaType = 'audio'
         text = '[語音訊息]'
-        mediaPath = await downloadLineContent(event.message.id, 'audio')
       } else if (msgType === 'file') {
         mediaType = 'file'
         text = `[檔案: ${event.message.fileName ?? '未知'}]`
-        mediaPath = await downloadLineContent(event.message.id, 'file', event.message.fileName)
       } else if (msgType === 'sticker') {
         mediaType = 'sticker'
         text = `[貼圖: ${event.message.packageId}/${event.message.stickerId}]`
@@ -349,10 +344,22 @@ Bun.serve({
       const userId  = event.source?.userId ?? 'unknown'
       const groupId = event.source?.groupId as string | undefined
 
-      // Access control: check allowlist before queuing
+      // Access control: check allowlist BEFORE downloading media to prevent resource leak
       if (!isAllowed(userId, groupId)) {
         process.stderr.write(`[line-lobster/webhook] BLOCKED: userId=${userId}${groupId ? ` groupId=${groupId}` : ''} not in allowlist\n`)
         continue
+      }
+
+      // Download media only after allowlist passes
+      let mediaPath: string | null = null
+      if (msgType === 'image') {
+        mediaPath = await downloadLineContent(event.message.id, 'image')
+      } else if (msgType === 'video') {
+        mediaPath = await downloadLineContent(event.message.id, 'video')
+      } else if (msgType === 'audio') {
+        mediaPath = await downloadLineContent(event.message.id, 'audio')
+      } else if (msgType === 'file') {
+        mediaPath = await downloadLineContent(event.message.id, 'file', event.message.fileName)
       }
 
       const msg: Record<string, any> = {

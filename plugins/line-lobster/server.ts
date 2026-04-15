@@ -14,7 +14,7 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
-import { readFileSync, chmodSync, existsSync, appendFileSync, writeFileSync, statSync, unlinkSync, realpathSync } from 'fs'
+import { readFileSync, chmodSync, existsSync, appendFileSync, writeFileSync, statSync, unlinkSync, realpathSync, renameSync } from 'fs'
 import { homedir } from 'os'
 import { join, sep, resolve } from 'path'
 
@@ -254,9 +254,12 @@ const REPLY_TOKEN_TTL_MS = 3 * 60 * 1000  // LINE reply token 約 1 分鐘，3 �
 
 function queueDrain(): PendingMessage[] {
   if (!existsSync(QUEUE_FILE)) return []
-  const raw = readFileSync(QUEUE_FILE, 'utf8').trim()
+  // Atomic drain: rename → read → unlink. Prevents race with webhook appendFileSync.
+  const tmp = QUEUE_FILE + '.drain'
+  try { renameSync(QUEUE_FILE, tmp) } catch { return [] }
+  const raw = readFileSync(tmp, 'utf8').trim()
+  try { unlinkSync(tmp) } catch {}
   if (!raw) return []
-  writeFileSync(QUEUE_FILE, '', 'utf8')
   const now = Date.now()
   return raw.split('\n').filter(l => l.trim()).map(l => JSON.parse(l) as PendingMessage).filter(m => {
     if (now - m.ts > REPLY_TOKEN_TTL_MS) {
@@ -517,6 +520,9 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (req) => {
       return { content: [{ type: 'text', text: 'ERROR: text is empty or undefined — not sent. Please provide actual reply text.' }] }
     }
     const chunks = splitText(String(replyText))
+    if (chunks.length > 5) {
+      console.error(`[line-lobster] WARNING: reply text split into ${chunks.length} chunks, LINE API cap is 5 — ${chunks.length - 5} chunk(s) dropped`)
+    }
     // LINE reply API accepts up to 5 messages per call; attach quick_replies to last chunk
     const messages: any[] = chunks.slice(0, 5).map((chunk, i) => {
       const msg: any = { type: 'text', text: chunk }

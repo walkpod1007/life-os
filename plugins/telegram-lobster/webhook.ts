@@ -26,7 +26,10 @@ try {
 
 const BOT_TOKEN     = process.env.TELEGRAM_BOT_TOKEN ?? ''
 const PORT          = parseInt(process.env.TG_WEBHOOK_PORT ?? '8443')
-const SECRET_TOKEN  = process.env.TG_WEBHOOK_SECRET ?? 'tg-lobster-secret'
+const SECRET_TOKEN  = process.env.TG_WEBHOOK_SECRET ?? (() => {
+  process.stderr.write('[tg-lobster/webhook] WARNING: TG_WEBHOOK_SECRET not set — webhook is unprotected. Set this env var in ~/.claude/channels/telegram/.env\n')
+  return ''
+})()
 const TG_CHANNEL_DIR = join(homedir(), '.claude', 'channels', 'telegram')
 const TG_RUNTIME    = join(TG_CHANNEL_DIR, 'runtime')
 const TG_MEDIA_DIR  = join(TG_RUNTIME, 'media')
