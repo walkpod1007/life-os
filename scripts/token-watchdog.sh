@@ -67,6 +67,8 @@ case "$TMUX_TARGET" in
 esac
 MCP_KILL_COUNT=0
 MCP_KILL_LIMIT=3  # 最多觸發 3 次 kill，防止 MCP 持續失敗造成 kill loop
+MCP_GRACE_SECS=120  # watchdog 啟動後前 120 秒不做 MCP check（等 claude + MCP 完全就緒）
+WATCHDOG_START_TS=$(date +%s)
 
 # ── Session pinning：用 lsof 鎖定本 session claude 正在寫的 JSONL ──
 # watchdog 是 supervisor 的 background child，supervisor 也是 claude 的 parent。
@@ -99,8 +101,8 @@ while true; do
             fi
         fi
 
-        # 4. MCP server 存活確認
-        if [ -n "$MCP_BINARY" ] && [ "$MCP_KILL_COUNT" -lt "$MCP_KILL_LIMIT" ]; then
+        # 4. MCP server 存活確認（啟動 120 秒寬限期後才開始檢查）
+        if [ -n "$MCP_BINARY" ] && [ "$MCP_KILL_COUNT" -lt "$MCP_KILL_LIMIT" ] && [ $((NOW_HC - WATCHDOG_START_TS)) -gt "$MCP_GRACE_SECS" ]; then
           CLAUDE_PID=$(pgrep -P "$SUPERVISOR_PID" -x claude 2>/dev/null | head -1)
           if [ -n "$CLAUDE_PID" ]; then
             MCP_PID=$(pgrep -P "$CLAUDE_PID" -f "$MCP_BINARY" 2>/dev/null | head -1)
