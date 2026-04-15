@@ -150,6 +150,21 @@ function queueCount(): number {
 
 // ── tmux notification (fire-and-forget) ───────────────────────────────────────
 
+const COOLDOWN_FILE = join(TG_RUNTIME, 'tg-trigger-cooldown')
+const COOLDOWN_MS = 30_000  // 30 秒內只送一次觸發語，避免 input buffer 疊加
+
+function shouldNotify(): boolean {
+  const now = Date.now()
+  try {
+    if (existsSync(COOLDOWN_FILE)) {
+      const last = parseInt(readFileSync(COOLDOWN_FILE, 'utf8'))
+      if (!isNaN(last) && now - last < COOLDOWN_MS) return false
+    }
+  } catch {}
+  try { writeFileSync(COOLDOWN_FILE, String(now), 'utf8') } catch {}
+  return true
+}
+
 function notifyTmux(): void {
   Bun.spawn(
     ['tmux', 'send-keys', '-t', TMUX_SESSION, TMUX_MSG, 'Enter'],
@@ -265,7 +280,11 @@ Bun.serve({
         appendFileSync(QUEUE_FILE, JSON.stringify(entry) + '\n', 'utf8')
         const preview = text.slice(0, 60) + (mediaType ? ` [${mediaType}]` : '')
         process.stderr.write(`[tg-lobster/webhook] queued from ${entry.chatId}: ${preview}\n`)
-        notifyTmux()
+        if (shouldNotify()) {
+          notifyTmux()
+        } else {
+          process.stderr.write(`[tg-lobster/webhook] notify skipped (cooldown)\n`)
+        }
       }
     } else {
       process.stderr.write(`[tg-lobster/webhook] ignored update: no message or chat\n`)
