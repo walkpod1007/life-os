@@ -280,18 +280,19 @@ function shouldNotify(session: string): boolean {
 }
 
 function notifyTmux(session: string): void {
-  Bun.spawn(
-    ['tmux', 'send-keys', '-t', session, TMUX_MSG, 'Enter'],
-    { stdout: 'ignore', stderr: 'pipe' }
-  ).exited.then(code => {
-    if (code !== 0) {
-      process.stderr.write(
-        `[line-lobster/webhook] WARN: tmux session "${session}" not found (code ${code})\n`
-      )
-    }
-  }).catch(err => {
-    process.stderr.write(`[line-lobster/webhook] WARN: tmux notify error: ${err}\n`)
-  })
+  const msgEscaped = TMUX_MSG.replace(/'/g, "'\\''")
+  const script = `
+    for i in 1 2 3 4 5 6; do
+      pane=$(tmux capture-pane -t '${session}' -p 2>/dev/null | tail -3)
+      if echo "$pane" | grep -q '❯'; then
+        tmux send-keys -t '${session}' '${msgEscaped}' Enter
+        exit 0
+      fi
+      sleep 3
+    done
+    tmux send-keys -t '${session}' '${msgEscaped}' Enter
+  `
+  Bun.spawn(['bash', '-c', script], { stdout: 'ignore', stderr: 'ignore' })
 }
 
 // ── HTTP Server ───────────────────────────────────────────────────────────────
