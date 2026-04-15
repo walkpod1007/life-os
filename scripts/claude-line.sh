@@ -40,7 +40,7 @@ while true; do
 
   # 重啟後主動排水 — 不等 webhook 觸發才醒
   (
-    sleep 10
+    sleep 25
     if tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
       tmux send-keys -t "$TMUX_SESSION" "請呼叫 get_pending 讀取待處理的 LINE 訊息並回覆。" Enter
       echo "$(date): auto-sent get_pending trigger" >> "$LOG"

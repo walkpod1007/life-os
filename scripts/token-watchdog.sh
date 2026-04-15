@@ -74,7 +74,7 @@ while true; do
 
         # 1. Permission dialog 偵測 → 自動 Escape 解鎖
         PANE=$(tmux capture-pane -t "$TMUX_TARGET" -p 2>/dev/null)
-        if echo "$PANE" | grep -qE "Do you want to make this edit|allow Claude to edit|1\. Yes|2\. Yes, and allow"; then
+        if echo "$PANE" | grep -qE "Do you want to make this edit|Do you want to run this command|allow Claude to edit|1\. Yes|2\. Yes, and allow"; then
             echo "$(date): health-check[$TMUX_TARGET] ⚠️ permission dialog 偵測，送 Escape 解鎖" >> "$LOG"
             tmux send-keys -t "$TMUX_TARGET" Escape 2>/dev/null
         fi
