@@ -8,13 +8,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 HOOKS_DIR="$REPO_ROOT/hooks"
 
-TMUX_TARGET="${1:-claude-telegram}"   # 接受參數，預設 claude-telegram
+TMUX_TARGET="${1:?ERROR: token-watchdog requires a session name argument}"
 THRESHOLD=150000
 CHECK_INTERVAL=60
 # log 跟對應 supervisor 寫同一個檔案，方便 debug 時看完整流程
 case "$TMUX_TARGET" in
   claude-telegram) LOG="$HOME/.claude/claude-telegram.log" ;;
   claude-line)     LOG="$HOME/.claude/claude-line.log" ;;
+  claude-line-note) LOG="$HOME/.claude/claude-line-note.log" ;;
   claude-remote)   LOG="$HOME/.claude/claude-remote.log" ;;
   claude-terminal) LOG="$HOME/.claude/claude-terminal.log" ;;
   *)               LOG="$HOME/.claude/supervisor.log" ;;
@@ -38,6 +39,25 @@ if [ -f "$TRIGGERED_FLAG" ]; then
     echo "$(date): token-watchdog[$TMUX_TARGET] 啟動時清除殘留 flag（新 session 乾淨開始）" >> "$LOG"
 fi
 
+# ── Health check 設定 ──────────────────────────────────────────────────────────
+HEALTH_CHECK_INTERVAL=120   # 每 2 分鐘做一次
+QUEUE_STALE_SECS=300        # queue 有內容且超過 5 分鐘未清 → 補觸發
+LAST_HEALTH_CHECK=0
+
+# 各 session 對應的 queue 檔路徑（沒有 queue 的 session 留空）
+case "$TMUX_TARGET" in
+  claude-line)      HEALTH_QUEUE="$HOME/.claude/channels/line/runtime/line-lobster-queue.jsonl" ;;
+  claude-line-note) HEALTH_QUEUE="$HOME/.claude/channels/line/runtime/line-lobster-queue-line-note.jsonl" ;;
+  *)                HEALTH_QUEUE="" ;;
+esac
+
+# health check 補觸發用語
+case "$TMUX_TARGET" in
+  claude-line|claude-line-note) HEALTH_TRIGGER="請呼叫 get_pending 讀取待處理的 LINE 訊息並回覆。" ;;
+  claude-telegram)              HEALTH_TRIGGER="請呼叫 get_pending 讀取待處理的 Telegram 訊息並回覆。" ;;
+  *)                            HEALTH_TRIGGER="" ;;
+esac
+
 # ── Session pinning：用 lsof 鎖定本 session claude 正在寫的 JSONL ──
 # watchdog 是 supervisor 的 background child，supervisor 也是 claude 的 parent。
 # 透過 PPID 找到同一個 supervisor 下的 claude，再用 lsof 找它開著的 .jsonl。
@@ -46,6 +66,29 @@ SUPERVISOR_PID="$PPID"  # watchdog 的 parent 就是 supervisor
 
 while true; do
     sleep "$CHECK_INTERVAL"
+
+    # ── Health check（每 2 分鐘）────────────────────────────────────────────
+    NOW_HC=$(date +%s)
+    if [ $((NOW_HC - LAST_HEALTH_CHECK)) -ge "$HEALTH_CHECK_INTERVAL" ]; then
+        LAST_HEALTH_CHECK=$NOW_HC
+
+        # 1. Permission dialog 偵測 → 自動 Escape 解鎖
+        PANE=$(tmux capture-pane -t "$TMUX_TARGET" -p 2>/dev/null)
+        if echo "$PANE" | grep -qE "Do you want to make this edit|allow Claude to edit|1\. Yes|2\. Yes, and allow"; then
+            echo "$(date): health-check[$TMUX_TARGET] ⚠️ permission dialog 偵測，送 Escape 解鎖" >> "$LOG"
+            tmux send-keys -t "$TMUX_TARGET" Escape 2>/dev/null
+        fi
+
+        # 2. Queue 積壓偵測 → 補觸發 get_pending
+        if [ -n "$HEALTH_QUEUE" ] && [ -f "$HEALTH_QUEUE" ]; then
+            QUEUE_SIZE=$(wc -c < "$HEALTH_QUEUE" 2>/dev/null || echo 0)
+            QUEUE_MTIME=$(stat -f %m "$HEALTH_QUEUE" 2>/dev/null || echo 0)
+            if [ "$QUEUE_SIZE" -gt 0 ] && [ $((NOW_HC - QUEUE_MTIME)) -gt "$QUEUE_STALE_SECS" ]; then
+                echo "$(date): health-check[$TMUX_TARGET] ⚠️ queue 積壓 ${QUEUE_SIZE}B / $((NOW_HC - QUEUE_MTIME))s，補觸發" >> "$LOG"
+                [ -n "$HEALTH_TRIGGER" ] && tmux send-keys -t "$TMUX_TARGET" "$HEALTH_TRIGGER" Enter 2>/dev/null
+            fi
+        fi
+    fi
 
     # ── 如果尚未 pin，透過 lsof 找 claude 正在寫的 JSONL ──
     if [ -z "$PINNED_JSONL" ]; then
