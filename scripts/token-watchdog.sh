@@ -93,7 +93,7 @@ while true; do
 
         # 2. Queue 積壓偵測 → 補觸發 get_pending
         if [ -n "$HEALTH_QUEUE" ] && [ -f "$HEALTH_QUEUE" ]; then
-            QUEUE_SIZE=$(wc -c < "$HEALTH_QUEUE" 2>/dev/null || echo 0)
+            QUEUE_SIZE=$(wc -l < "$HEALTH_QUEUE" 2>/dev/null || echo 0)
             QUEUE_MTIME=$(stat -f %m "$HEALTH_QUEUE" 2>/dev/null || echo 0)
             if [ "$QUEUE_SIZE" -gt 0 ] && [ $((NOW_HC - QUEUE_MTIME)) -gt "$QUEUE_STALE_SECS" ]; then
                 echo "$(date): health-check[$TMUX_TARGET] ⚠️ queue 積壓 ${QUEUE_SIZE}B / $((NOW_HC - QUEUE_MTIME))s，補觸發" >> "$LOG"
