@@ -1,11 +1,22 @@
 # Todo — 待處理清單
 
-> 更新日期：2026-03-24
+> 更新日期：2026-04-15（搬家後全面刷新）
 
-1. **Reddit API 審核中** — walkpod 已送出申請，等 Reddit 審核（3-7 天）。通過後裝 mcp-reddit + 設定 .mcp.json
-2. **Skill 存放位置** — 阿普的 Skill 是否從 Vault 搬出，用戶正在跟德瑪/小蝦確認
-3. **建立剩餘 4 本主題筆記本**（科技、寶可夢、電影、性別）
-4. **設定 50 個頻道清單**（主題→頻道映射，目前只有 AI 學習 6 個）
-5. **Cloudflare Tunnel 路徑更新** — 從 90_System/Deliverables/ 改指 60_Deliverables/
-6. **30_Resources vs 30_Knowledge** — 確認是否合併
-7. **視覺化管理看板** — 技能、筆記本、摘要的 Dashboard（參考 Codex UI）
+## P0 — 功能恢復
+
+1. **測試驗收** — LINE 文字/照片、Telegram 文字/語音/react，等 channel 任務跑完後做
+2. **缺失腳本還原中** — file-extract.sh / voice-reply.sh / image-gen.sh / security-gate-hook.sh（Opus 執行中）
+
+## P1 — 基礎設施
+
+3. **supervisor 打架根治** — `kill -- -$PGID`、lockf TOCTOU、tmux socket 不一致（研究報告已完成，待執行）
+4. **TG_WEBHOOK_SECRET 設定** — 到 `~/.claude/channels/telegram/.env` 加上隨機 secret，更新 Telegram setWebhook
+
+## P2 — 功能擴展（第二輪）
+
+5. **Vault 建構** — Wiki 式建構、Flag 保存、做夢（使用者下一階段主軸）
+6. **lobster 公開分享** — 移除 hardcoded `Documents/Life-OS` 路徑、補 README（目前是個人用，要做成可分享版）
+
+## 待決策（需使用者輸入）
+
+7. **`claude install`** — Claude Code 提示切 native installer，需跑一次升級
