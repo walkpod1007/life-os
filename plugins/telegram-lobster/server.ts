@@ -154,6 +154,19 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ['chat_id', 'message_id', 'text'],
       },
     },
+    {
+      name: 'react',
+      description: 'Add an emoji reaction to a Telegram message. Telegram only accepts specific emojis from its whitelist (e.g. 👍 ❤️ 🔥 ✅ 👀 🎉). Useful to ack receipt without sending a reply.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          chat_id:    { type: 'string', description: 'Target chat ID (string form to handle large IDs)' },
+          message_id: { type: 'number', description: 'Message ID to react to' },
+          emoji:      { type: 'string', description: 'Single emoji from Telegram allowed reactions list' },
+        },
+        required: ['chat_id', 'message_id', 'emoji'],
+      },
+    },
   ],
 }))
 
@@ -211,6 +224,16 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const { chat_id, message_id, text } = args as { chat_id: number; message_id: number; text: string }
     await tgApiCall('sendMessage', { chat_id, text, reply_to_message_id: message_id })
     return { content: [{ type: 'text', text: `replied to message ${message_id} in chat ${chat_id}` }] }
+  }
+
+  if (name === 'react') {
+    const { chat_id, message_id, emoji } = args as { chat_id: string; message_id: number; emoji: string }
+    await tgApiCall('setMessageReaction', {
+      chat_id,
+      message_id,
+      reaction: [{ type: 'emoji', emoji }],
+    })
+    return { content: [{ type: 'text', text: `reacted ${emoji} on message ${message_id} in chat ${chat_id}` }] }
   }
 
   throw new Error(`Unknown tool: ${name}`)
