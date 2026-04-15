@@ -14,9 +14,9 @@ import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
-import { readFileSync, chmodSync, existsSync, appendFileSync, writeFileSync, statSync, unlinkSync } from 'fs'
+import { readFileSync, chmodSync, existsSync, appendFileSync, writeFileSync, statSync, unlinkSync, realpathSync } from 'fs'
 import { homedir } from 'os'
-import { join } from 'path'
+import { join, sep, resolve } from 'path'
 
 // ── Credentials ───────────────────────────────────────────────────────────────
 
@@ -176,6 +176,36 @@ function boostKeywords(newKeywords: ChannelKeyword[]): void {
   writeFileSync(FLAG_FILE, serializeFlag(channels))
 }
 
+// ── Path safety (assertSendable) ──────────────────────────────────────────────
+// Restrict media file reads/sends to known-safe directories. Reject paths
+// containing '..' or any path that, after realpath resolution, escapes the
+// allowed roots. Mirrors official telegram channels' assertSendable model.
+
+const MEDIA_ALLOWED_ROOTS = [
+  '/tmp',
+  join(homedir(), 'Documents', 'Life-OS', 'media'),
+  join(homedir(), '.claude', 'channels', 'line', 'runtime', 'media'),
+  join(homedir(), 'Library', 'Mobile Documents', 'iCloud~md~obsidian', 'Documents', 'Obsidian Vault', '90-system', 'audio'),
+]
+
+function assertSendable(filePath: string): void {
+  if (typeof filePath !== 'string' || filePath.length === 0) {
+    throw new Error(`assertSendable: path must be a non-empty string`)
+  }
+  if (filePath.includes('..')) {
+    throw new Error(`assertSendable: path contains '..': ${filePath}`)
+  }
+  const abs = resolve(filePath)
+  let real: string
+  try { real = realpathSync(abs) } catch { real = abs }
+  for (const root of MEDIA_ALLOWED_ROOTS) {
+    let rootReal: string
+    try { rootReal = realpathSync(root) } catch { rootReal = root }
+    if (real === rootReal || real.startsWith(rootReal + sep)) return
+  }
+  throw new Error(`assertSendable: path not in allowed roots: ${filePath}`)
+}
+
 // ── Media helpers ─────────────────────────────────────────────────────────────
 
 const MIME_MAP: Record<string, string> = {
@@ -198,6 +228,7 @@ function isImageMime(mime: string): boolean {
 
 function readMediaAsBase64(filePath: string): { data: string; mimeType: string } | null {
   try {
+    assertSendable(filePath)
     if (!existsSync(filePath)) return null
     const stat = statSync(filePath)
     if (stat.size > 20 * 1024 * 1024) return null
@@ -431,13 +462,21 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (req) => {
       // Attach image inline if available
       const mediaPath = (m as any).mediaPath
       if (mediaPath) {
-        const media = readMediaAsBase64(mediaPath)
-        if (media && isImageMime(media.mimeType)) {
-          contentBlocks.push({ type: 'image', data: media.data, mimeType: media.mimeType })
-        } else if (media) {
-          contentBlocks.push({ type: 'text', text: `[附件: ${mediaPath} (${media.mimeType})]` })
+        // Refuse to touch paths outside known-safe media roots
+        let safePath = true
+        try { assertSendable(mediaPath) } catch (err) {
+          safePath = false
+          contentBlocks.push({ type: 'text', text: `[附件路徑被拒: ${err}]` })
         }
-        try { unlinkSync(mediaPath) } catch {}
+        if (safePath) {
+          const media = readMediaAsBase64(mediaPath)
+          if (media && isImageMime(media.mimeType)) {
+            contentBlocks.push({ type: 'image', data: media.data, mimeType: media.mimeType })
+          } else if (media) {
+            contentBlocks.push({ type: 'text', text: `[附件: ${mediaPath} (${media.mimeType})]` })
+          }
+          try { unlinkSync(mediaPath) } catch {}
+        }
       }
     }
     return { content: contentBlocks }

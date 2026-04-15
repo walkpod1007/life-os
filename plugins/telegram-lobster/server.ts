@@ -11,9 +11,9 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync, renameSync, unlinkSync, statSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, chmodSync, renameSync, unlinkSync, statSync, realpathSync } from 'fs'
 import { homedir } from 'os'
-import { join } from 'path'
+import { join, sep, resolve } from 'path'
 
 // ── Credentials ───────────────────────────────────────────────────────────────
 
@@ -67,6 +67,36 @@ function formatTime(unixSec: number): string {
   }).replace(/\//g, '-')
 }
 
+// ── Path safety (assertSendable) ──────────────────────────────────────────────
+// Restrict media file reads/sends to known-safe directories. Reject paths
+// containing '..' or any path that, after realpath resolution, escapes the
+// allowed roots. Mirrors official telegram channels' assertSendable model.
+
+const MEDIA_ALLOWED_ROOTS = [
+  '/tmp',
+  join(homedir(), 'Documents', 'Life-OS', 'media'),
+  join(homedir(), '.claude', 'channels', 'telegram', 'runtime', 'media'),
+  join(homedir(), 'Library', 'Mobile Documents', 'iCloud~md~obsidian', 'Documents', 'Obsidian Vault', '90-system', 'audio'),
+]
+
+function assertSendable(filePath: string): void {
+  if (typeof filePath !== 'string' || filePath.length === 0) {
+    throw new Error(`assertSendable: path must be a non-empty string`)
+  }
+  if (filePath.includes('..')) {
+    throw new Error(`assertSendable: path contains '..': ${filePath}`)
+  }
+  const abs = resolve(filePath)
+  let real: string
+  try { real = realpathSync(abs) } catch { real = abs }
+  for (const root of MEDIA_ALLOWED_ROOTS) {
+    let rootReal: string
+    try { rootReal = realpathSync(root) } catch { rootReal = root }
+    if (real === rootReal || real.startsWith(rootReal + sep)) return
+  }
+  throw new Error(`assertSendable: path not in allowed roots: ${filePath}`)
+}
+
 // ── Media helpers ─────────────────────────────────────────────────────────────
 
 const MIME_MAP: Record<string, string> = {
@@ -91,6 +121,7 @@ function isImageMime(mime: string): boolean {
 
 function readMediaAsBase64(filePath: string): { data: string; mimeType: string } | null {
   try {
+    assertSendable(filePath)
     if (!existsSync(filePath)) return null
     const stat = statSync(filePath)
     if (stat.size > 20 * 1024 * 1024) return null  // skip files > 20MB
@@ -207,20 +238,28 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
       // Attach image inline if available
       if (m.mediaPath) {
-        const media = readMediaAsBase64(m.mediaPath)
-        const isAudio = m.mediaType === 'voice' || m.mediaType === 'audio'
-        if (media && isImageMime(media.mimeType)) {
-          contentBlocks.push({ type: 'image', data: media.data, mimeType: media.mimeType })
-          // Clean up image after embedding
-          try { unlinkSync(m.mediaPath) } catch {}
-        } else if (media) {
-          contentBlocks.push({ type: 'text', text: `[附件: ${m.mediaPath} (${media.mimeType})]` })
-          // Keep audio/voice files so session can run whisper transcription
-          if (!isAudio) {
+        // Refuse to touch paths outside known-safe media roots
+        let safePath = true
+        try { assertSendable(m.mediaPath) } catch (err) {
+          safePath = false
+          contentBlocks.push({ type: 'text', text: `[附件路徑被拒: ${err}]` })
+        }
+        if (safePath) {
+          const media = readMediaAsBase64(m.mediaPath)
+          const isAudio = m.mediaType === 'voice' || m.mediaType === 'audio'
+          if (media && isImageMime(media.mimeType)) {
+            contentBlocks.push({ type: 'image', data: media.data, mimeType: media.mimeType })
+            // Clean up image after embedding
             try { unlinkSync(m.mediaPath) } catch {}
+          } else if (media) {
+            contentBlocks.push({ type: 'text', text: `[附件: ${m.mediaPath} (${media.mimeType})]` })
+            // Keep audio/voice files so session can run whisper transcription
+            if (!isAudio) {
+              try { unlinkSync(m.mediaPath) } catch {}
+            }
+          } else if (!existsSync(m.mediaPath)) {
+            contentBlocks.push({ type: 'text', text: `[附件下載失敗: ${m.mediaPath}]` })
           }
-        } else if (!existsSync(m.mediaPath)) {
-          contentBlocks.push({ type: 'text', text: `[附件下載失敗: ${m.mediaPath}]` })
         }
       }
     }
