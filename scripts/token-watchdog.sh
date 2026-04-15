@@ -59,6 +59,15 @@ case "$TMUX_TARGET" in
   *)                            HEALTH_TRIGGER="" ;;
 esac
 
+# MCP server 存活確認設定
+case "$TMUX_TARGET" in
+  claude-line|claude-line-note) MCP_BINARY="line-lobster/server.ts" ;;
+  claude-telegram)              MCP_BINARY="telegram-lobster/server.ts" ;;
+  *)                            MCP_BINARY="" ;;
+esac
+MCP_KILL_COUNT=0
+MCP_KILL_LIMIT=3  # 最多觸發 3 次 kill，防止 MCP 持續失敗造成 kill loop
+
 # ── Session pinning：用 lsof 鎖定本 session claude 正在寫的 JSONL ──
 # watchdog 是 supervisor 的 background child，supervisor 也是 claude 的 parent。
 # 透過 PPID 找到同一個 supervisor 下的 claude，再用 lsof 找它開著的 .jsonl。
@@ -88,6 +97,24 @@ while true; do
                 echo "$(date): health-check[$TMUX_TARGET] ⚠️ queue 積壓 ${QUEUE_SIZE}B / $((NOW_HC - QUEUE_MTIME))s，補觸發" >> "$LOG"
                 [ -n "$HEALTH_TRIGGER" ] && tmux send-keys -t "$TMUX_TARGET" "$HEALTH_TRIGGER" Enter 2>/dev/null
             fi
+        fi
+
+        # 4. MCP server 存活確認
+        if [ -n "$MCP_BINARY" ] && [ "$MCP_KILL_COUNT" -lt "$MCP_KILL_LIMIT" ]; then
+          CLAUDE_PID=$(pgrep -P "$SUPERVISOR_PID" -x claude 2>/dev/null | head -1)
+          if [ -n "$CLAUDE_PID" ]; then
+            MCP_PID=$(pgrep -P "$CLAUDE_PID" -f "$MCP_BINARY" 2>/dev/null | head -1)
+            if [ -z "$MCP_PID" ]; then
+              MCP_KILL_COUNT=$((MCP_KILL_COUNT + 1))
+              echo "$(date): health-check[$TMUX_TARGET] ⚠️ MCP $MCP_BINARY 不存在，kill claude 重啟整條 (kill #$MCP_KILL_COUNT/$MCP_KILL_LIMIT)" >> "$LOG"
+              kill "$CLAUDE_PID" 2>/dev/null
+            else
+              # MCP 健康，重置計數器
+              MCP_KILL_COUNT=0
+            fi
+          fi
+        elif [ "$MCP_KILL_COUNT" -ge "$MCP_KILL_LIMIT" ]; then
+          echo "$(date): health-check[$TMUX_TARGET] ⛔ MCP kill 次數達上限 $MCP_KILL_LIMIT，停止自動 kill，請人工介入" >> "$LOG"
         fi
     fi
 
