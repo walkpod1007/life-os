@@ -40,7 +40,7 @@ if [ -f "$TRIGGERED_FLAG" ]; then
 fi
 
 # ── Health check 設定 ──────────────────────────────────────────────────────────
-HEALTH_CHECK_INTERVAL=120   # 每 2 分鐘做一次
+HEALTH_CHECK_INTERVAL=60    # 每 1 分鐘做一次（MCP 死亡最慢 120 秒偵測到）
 QUEUE_STALE_SECS=300        # queue 有內容且超過 5 分鐘未清 → 補觸發
 LAST_HEALTH_CHECK=0
 
@@ -48,6 +48,7 @@ LAST_HEALTH_CHECK=0
 case "$TMUX_TARGET" in
   claude-line)      HEALTH_QUEUE="$HOME/.claude/channels/line/runtime/line-lobster-queue.jsonl" ;;
   claude-line-note) HEALTH_QUEUE="$HOME/.claude/channels/line/runtime/line-lobster-queue-line-note.jsonl" ;;
+  claude-telegram)  HEALTH_QUEUE="$HOME/.claude/channels/telegram/runtime/tg-queue.jsonl" ;;
   *)                HEALTH_QUEUE="" ;;
 esac
 
