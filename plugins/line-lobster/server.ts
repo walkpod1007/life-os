@@ -31,7 +31,8 @@ try {
 
 const CHANNEL_TOKEN  = process.env.LINE_CHANNEL_ACCESS_TOKEN ?? ''
 const LINE_API       = 'https://api.line.me/v2/bot/message'
-const QUEUE_FILE     = process.env.LINE_QUEUE_FILE ?? '/tmp/line-lobster-queue.jsonl'
+const LINE_RUNTIME_DIR = join(homedir(), '.claude', 'channels', 'line', 'runtime')
+const QUEUE_FILE     = process.env.LINE_QUEUE_FILE ?? join(LINE_RUNTIME_DIR, 'line-lobster-queue.jsonl')
 const DISABLE_PUSH   = process.env.LINE_DISABLE_PUSH === 'true'
 
 if (!CHANNEL_TOKEN) {
@@ -267,6 +268,26 @@ function buildQuickReply(labels: string[]) {
   }
 }
 
+// LINE single message limit is 5000 characters.
+// Split text into chunks ≤ LINE_MSG_MAX, breaking on newlines where possible.
+const LINE_MSG_MAX = 5000
+
+function splitText(text: string): string[] {
+  if (text.length <= LINE_MSG_MAX) return [text]
+  const chunks: string[] = []
+  let remaining = text
+  while (remaining.length > LINE_MSG_MAX) {
+    // Try to split on last newline within the limit
+    const slice = remaining.slice(0, LINE_MSG_MAX)
+    const lastNewline = slice.lastIndexOf('\n')
+    const cutAt = lastNewline > LINE_MSG_MAX / 2 ? lastNewline + 1 : LINE_MSG_MAX
+    chunks.push(remaining.slice(0, cutAt))
+    remaining = remaining.slice(cutAt)
+  }
+  if (remaining) chunks.push(remaining)
+  return chunks
+}
+
 // ── MCP Server ────────────────────────────────────────────────────────────────
 
 const INSTRUCTIONS = `LINE Bot context for Claude Code.
@@ -456,12 +477,18 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (req) => {
     if (replyText == null || String(replyText).trim() === '' || String(replyText) === 'undefined') {
       return { content: [{ type: 'text', text: 'ERROR: text is empty or undefined — not sent. Please provide actual reply text.' }] }
     }
-    const msg: any = { type: 'text', text: String(replyText) }
-    if (Array.isArray(args!.quick_replies) && args!.quick_replies.length > 0) {
-      msg.quickReply = buildQuickReply(args!.quick_replies as string[])
-    }
-    await linePost('/reply', { replyToken: args!.reply_token, messages: [msg] })
-    return { content: [{ type: 'text', text: 'sent' }] }
+    const chunks = splitText(String(replyText))
+    // LINE reply API accepts up to 5 messages per call; attach quick_replies to last chunk
+    const messages: any[] = chunks.slice(0, 5).map((chunk, i) => {
+      const msg: any = { type: 'text', text: chunk }
+      if (i === chunks.length - 1 && Array.isArray(args!.quick_replies) && args!.quick_replies.length > 0) {
+        msg.quickReply = buildQuickReply(args!.quick_replies as string[])
+      }
+      return msg
+    })
+    await linePost('/reply', { replyToken: args!.reply_token, messages })
+    const note = chunks.length > 1 ? ` (split into ${chunks.length} messages)` : ''
+    return { content: [{ type: 'text', text: `sent${note}` }] }
   }
 
   if (name === 'push') {
@@ -478,12 +505,17 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (req) => {
     if (!to) {
       return { content: [{ type: 'text', text: 'ERROR: must provide group_id or user_id' }] }
     }
-    const msg: any = { type: 'text', text: String(pushText) }
-    if (Array.isArray(args!.quick_replies) && args!.quick_replies.length > 0) {
-      msg.quickReply = buildQuickReply(args!.quick_replies as string[])
-    }
-    await linePost('/push', { to, messages: [msg] })
-    return { content: [{ type: 'text', text: 'sent' }] }
+    const pushChunks = splitText(String(pushText))
+    const pushMessages: any[] = pushChunks.slice(0, 5).map((chunk, i) => {
+      const msg: any = { type: 'text', text: chunk }
+      if (i === pushChunks.length - 1 && Array.isArray(args!.quick_replies) && args!.quick_replies.length > 0) {
+        msg.quickReply = buildQuickReply(args!.quick_replies as string[])
+      }
+      return msg
+    })
+    await linePost('/push', { to, messages: pushMessages })
+    const pushNote = pushChunks.length > 1 ? ` (split into ${pushChunks.length} messages)` : ''
+    return { content: [{ type: 'text', text: `sent${pushNote}` }] }
   }
 
   if (name === 'flex') {
